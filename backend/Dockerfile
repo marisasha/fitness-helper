@@ -2,25 +2,16 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    curl build-essential \
+RUN apt-get update && apt-get install -y build-essential curl \
     && rm -rf /var/lib/apt/lists/*
-
 
 COPY requirments.txt .
 RUN pip install --no-cache-dir -r requirments.txt
 
 COPY . .
 
-COPY ../front /app/react
-WORKDIR /app/react
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install \
-    && npm run build
-
-WORKDIR /app
-RUN mkdir -p /app/static && cp -r /app/react/build/* /app/static/
+RUN mkdir -p /app/static
+COPY react/build /app/static
 
 RUN python manage.py collectstatic --noinput
 
