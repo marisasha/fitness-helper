@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.no-spinner {
+    -moz-appearance: textfield;
+}
+
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+
+.cyan-blocks {
+  background-color: #0a91b1;
+  color: #ffffffff;
+  border: 2px solid #0a91b1;
+}
+
+.cyan-blocks:hover {
+  background-color: #ffffffff;
+  color: #0a91b1;
+  border: 2px solid #0a91b1;
+}
