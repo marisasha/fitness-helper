@@ -53,12 +53,11 @@ export default function RegisterPage() {
   };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const username = e;
-    // @ts-ignore
+    const username = e.target.value; // <- берём значение из input
     setForm({ ...form, username });
-    // @ts-ignore
-    checkUsernameAvailability(username); 
-  };
+    checkUsernameAvailability(username);
+};
+
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,7 +162,10 @@ export default function RegisterPage() {
           <InputField
             label="Логин"
             value={form.username}
-            onChange={handleUsernameChange}
+            onChange={(val: string) => {
+              setForm({ ...form, username: val });
+              checkUsernameAvailability(val);
+            }}
             placeholder="Ivan"
           />
           {usernameError && <p className="text-red-500 text-sm">{usernameError}</p>}
@@ -171,16 +173,14 @@ export default function RegisterPage() {
           <InputField
             label="Пароль"
             value={form.password}
-            onChange={(e: any) => setForm({ ...form, password: e.target.value })}
+            onChange={(val: string) => setForm({ ...form, password: val })}
             placeholder="password"
             type="password"
           />
           <InputField
             label="Подтвердите пароль"
             value={form.password2}
-            onChange={(e: any) =>
-              setForm({ ...form, password2: e.target.value })
-            }
+            onChange={(val: string) => setForm({ ...form, password2: val })}
             placeholder="password"
             type="password"
           />
@@ -191,13 +191,13 @@ export default function RegisterPage() {
           <InputField
             label="Имя"
             value={form.name}
-            onChange={(val: any) => setForm({ ...form, name: val})}
+            onChange={(val: string) => setForm({ ...form, name: val })}
             placeholder="Иван"
           />
           <InputField
             label="Фамилия"
             value={form.surname}
-            onChange={(val: any) => setForm({ ...form, surname: val})}
+            onChange={(val: string) => setForm({ ...form, surname: val })}
             placeholder="Иванов"
           />
 
@@ -206,7 +206,7 @@ export default function RegisterPage() {
             value={form.birthDate}
             onChange={(val) => setForm({ ...form, birthDate: val })}
             placeholder="1990-09-09"
-          />        
+          />
 
           <NumericInput
             label="Вес (кг)"
@@ -224,7 +224,7 @@ export default function RegisterPage() {
 
         {/* Статусы */}
         <div className="md:col-span-2 mt-4">
-          <loaders.Loader1 isView={userRegister.load} /> 
+          <loaders.Loader1 isView={userRegister.load} />
           {userRegister.error && <Alert type="error" message={userRegister.error} />}
           {userRegister.fail && <Alert type="error" message={userRegister.fail} />}
           {userRegister.data && <Alert type="success" message="Вы успешно зарегистрировались!" />}
@@ -239,7 +239,7 @@ export default function RegisterPage() {
             >
               Зарегистрироваться
             </button>
-          ):(
+          ) : (
             <div
               className="flex w-1/2 justify-center rounded-md bg-cyan-600 px-3 py-1.5 text-sm font-semibold leading-6 text-slate-100 hover:text-cyan-600 shadow-sm hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 "
             >
