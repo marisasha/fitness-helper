@@ -2,7 +2,7 @@
 import { constructorConstant } from "../components/components";
 
 
-export const host = "http://fitness-helper.ru";
+export const host = "https://fitness-helper.ru";
 
 // app
 export const workoutList = constructorConstant("workoutList");
