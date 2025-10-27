@@ -1,15 +1,16 @@
 from datetime import timedelta
 from pathlib import Path
-import environ
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-env = environ.Env()
-environ.Env.read_env(BASE_DIR / ".env")
 
+SECRET_KEY = os.getenv("SECRET_KEY")
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-SECRET_KEY = env("SECRET_KEY")
-DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
@@ -65,11 +66,11 @@ WSGI_APPLICATION = 'django_settings.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DATABASE_NAME"),
-        "USER": env("DATABASE_USER"),
-        "PASSWORD": env("DATABASE_PASSWORD"),
-        "HOST": env("DATABASE_HOST"),
-        "PORT": env("DATABASE_PORT"),
+        "NAME": os.getenv("DATABASE_NAME"),
+        "USER": os.getenv("DATABASE_USER"),
+        "PASSWORD": os.getenv("DATABASE_PASSWORD"),
+        "HOST": os.getenv("DATABASE_HOST"),
+        "PORT": os.getenv("DATABASE_PORT"),
     }
 }
 
@@ -94,7 +95,7 @@ else:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": env("REDIS_LOCATION"),
+            "LOCATION": os.getenv("REDIS_LOCATION"),
         },
         "database_cache": {
             "BACKEND": "django.core.cache.backends.db.DatabaseCache",
@@ -175,10 +176,10 @@ SWAGGER_SETTINGS = {
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=env.int("ACCESS_TOKEN_LIFETIME", default=10)
+        minutes=int(os.getenv("ACCESS_TOKEN_LIFETIME", default=10))
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
-        minutes=env.int("REFRESH_TOKEN_LIFETIME", default=60)
+        minutes=int(os.getenv("REFRESH_TOKEN_LIFETIME", default=60))
     ),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
