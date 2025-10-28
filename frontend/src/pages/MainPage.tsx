@@ -69,9 +69,9 @@ export default function Page() {
   const getGreeting = () => {
     const hour = new Date().getHours();
     
-    if (hour >= 5 && hour < 12) return "Доброе утро , ";
-    if (hour >= 12 && hour < 18) return "Добрый день , ";
-    if (hour >= 18 && hour < 23) return "Добрый вечер , ";
+    if (hour >= 5 && hour < 12) return "Доброе утро, ";
+    if (hour >= 12 && hour < 18) return "Добрый день, ";
+    if (hour >= 18 && hour < 23) return "Добрый вечер, ";
     return "Доброй ночи , ";
   };
 
@@ -109,11 +109,11 @@ export default function Page() {
           
           {profile?.data && !profile.load && (
 
-            <div className="flex gap-x-5">
+            <div className="flex flex-col md:flex-row md:gap-x-5 items-center">
               <h1 className=" text-slate-100 font-bold animate-fade-in">
                 {getGreeting()}
               </h1>
-                <h1 className="text-slate-100 font-bold animate-fade-in">
+                <h1 className="text-slate-100 text-4xl md:text-6xl font-bold animate-fade-in">
                   {profile.data} !
                 </h1>
             </div>

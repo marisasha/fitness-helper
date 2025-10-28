@@ -199,7 +199,7 @@ export default function FriendsPage() {
             {requests.data.map((friend: any) => (
               <div
                 key={friend.friend_id}
-                className="flex items-center mx-5  p-2 rounded-xl shadow gap-4 border-2 border-slate-100"
+                className="flex items-center border-2 border-slate-100 p-4 rounded-2xl shadow gap-4 w-full max-w-md  justify-start"
               >
                 <img
                   src={constants.host + friend.friend_avatar}

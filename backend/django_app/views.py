@@ -732,7 +732,7 @@ def api_user_purpose(request: Request, user_id: int) -> Response:
         )
     except Exception as e:
         return Response(
-            {"message": "Server Error!"},
+            {"message": f"Server Error!{e}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
