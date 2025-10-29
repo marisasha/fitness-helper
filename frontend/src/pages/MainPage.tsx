@@ -105,7 +105,7 @@ export default function Page() {
     <bases.Base>
       <div className="flex flex-col w-full mt-10">
 
-        <div className="p-4 flex flex-col md:flex-row w-full justify-between items-start text-3xl md:text-5xl items-center md:items-start">
+        <div className="p-4 flex flex-col md:flex-row w-full md:w-11/12 justify-between items-start text-3xl md:text-5xl items-center md:items-start">
           
           {profile?.data && !profile.load && (
 
@@ -146,7 +146,7 @@ export default function Page() {
                   ></div>
                 </div>
                 <div className="flex items-end text-lg font-semibold leading-6 justify-center mt-3">
-                  <span className="text-5xl text-cyan-600 hover:text-gray-600">Fitnes</span>
+                  <span className="text-5xl text-cyan-600 hover:text-gray-600">Fitness</span>
                   <span className="text-gray-600 hover:text-cyan-600">helper</span>
                 </div>
 
@@ -154,11 +154,11 @@ export default function Page() {
             )}
 
             {!purpose.data && !purpose.load && !showCreateForm && (
-              <div className="w-full sm:w-60 flex justify-center p-3 text-center bg-cyan-600 hover:bg-slate-100 rounded-3xl transition">
+              <div className="w-full sm:w-60 flex justify-center p-3 text-center bg-cyan-600 hover:bg-slate-100 rounded-3xl transition  text-slate-100  hover:text-cyan-600">
 
                 <button
                   onClick={() => setShowCreateForm(true)}
-                  className="text-lg sm:text-xl font-bold leading-9 tracking-tight text-slate-100 hover:text-cyan-600"
+                  className="text-lg sm:text-xl font-bold leading-9 tracking-tight"
                 >
                   Добавить цель посещений на {monthName}
                 </button>
@@ -167,36 +167,39 @@ export default function Page() {
             )}
 
             {showCreateForm && (
-              <div className="flex flex-col gap-y-5 bg-white shadow-md rounded-2xl p-4 text-center">
-
-                <div className="flex gap-x-5 items-center">
-                  <h3 className="font-semibold text-lg">
-                    Цель посещений на {monthName}
-                  </h3>
-                  <div className="flex gap-x-3">
-                    <button
-                      onClick={createPurpose}
-                      className="bg-cyan-600 text-slate-100 px-3 py-1 rounded-lg hover:bg-slate-100 hover:text-cyan-600"
-                    >
-                      Сохранить
-                    </button>
-                    <button
-                      onClick={() => setShowCreateForm(false)}
-                      className="bg-cyan-600 text-slate-100 px-4 py-1 rounded-lg hover:bg-slate-100 hover:text-cyan-600"
-                    >
-                      Отмена
-                    </button>
+                <div className="bg-white shadow-md rounded-2xl p-4 text-center w-3/4 ">
+                  
+                  <div className="flex flex-col sm:items-center md:justify-between gap-y-2 sm:gap-y-0">
+                    <h3 className="font-semibold text-lg sm:text-xl">
+                      Цель посещений на {monthName}
+                    </h3>
+                    <div className="mt-2">
+                      <NumericInput
+                        value={newPurpose}
+                        placeholder="Количество дней"
+                        onChange={setNewPurpose}
+                        min={1}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-x-2">
+                      <button
+                        onClick={createPurpose}
+                        className="bg-cyan-600 text-slate-100 px-1 py-1 rounded-md text-lg hover:bg-white hover:text-cyan-600 border-2 border-cyan-600 transition-colors duration-200"
+                      >
+                        Сохранить
+                      </button>
+                      <button
+                        onClick={() => setShowCreateForm(false)}
+                        className="bg-cyan-600 text-slate-100 px-3 py-1 rounded-md text-lg hover:bg-white hover:text-cyan-600 border-2 border-cyan-600 transition-colors duration-200"
+                      >
+                        Отмена
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <NumericInput
-                  value={newPurpose}
-                  placeholder="Количество дней"
-                  onChange={setNewPurpose}
-                  min={1}
-                />
 
-              </div>
-            )}
+
+                </div>
+              )}
 
             {purpose.error && !purpose.load && (
               <p className="text-red-500 text-sm mt-3">Ошибка загрузки данных</p>
@@ -271,7 +274,7 @@ function NumericInput({
       inputMode="numeric"
       pattern="[0-9]*"
       min={min}
-      className="no-spinner border p-2 rounded-lg w-full text-center"
+      className="no-spinner border p-2 rounded-lg w-full text-center text-lg"
       placeholder={placeholder}
       value={value ?? ""}
       onChange={(e) =>

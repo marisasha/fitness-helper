@@ -13,10 +13,14 @@ from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 from drf_spectacular.utils import extend_schema
+from django_settings import settings
 from datetime import timedelta
 from django.utils import timezone
+from django.utils.text import slugify
 from django.shortcuts import render
 from django.http import HttpRequest
+import redis
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -29,27 +33,10 @@ def index(request) -> HttpRequest:
 @api_view(http_method_names=["GET"])
 @permission_classes([AllowAny])
 def api(request: Request) -> Response:
-    return Response(data={"message": "ok, we are staring!"})
+    return Response(data={"message": "ok"})
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
-
-
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def api_list_users(request: Request) -> Response:
-    users = User.objects.all()
-    user_serializer = output_serializers.UserListSimpleSerializer(users, many=True).data
-    user_serializer_with_cache = utils.Cache.get_cache(
-        key="users_cache", query=lambda: user_serializer, timeout=5
-    )
-    return Response(
-        data={"data": user_serializer_with_cache}, status=status.HTTP_200_OK
-    )
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
-
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -111,6 +98,9 @@ def api_user_register(request: Request) -> Response:
         profile.avatar = avatar
     profile.save()
 
+    utils.Cache.delete_cache("users_cache")
+    utils.Cache.delete_cache("profiles_cache")
+
     return Response(
         {"success": "Account successfully created!"}, status=status.HTTP_201_CREATED
     )
@@ -141,6 +131,7 @@ def api_change_user_register(request: Request, user_id: int) -> Response:
     else:
         return Response(data_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
     user = User.objects.get(id=user_id)
     profile = models.Profile.objects.get(user=user)
     if username:
@@ -164,6 +155,10 @@ def api_change_user_register(request: Request, user_id: int) -> Response:
     profile.save()
     user.save()
 
+    utils.Cache.delete_cache("profiles_cache")
+    utils.Cache.delete_cache(f"profile_cache_{user_id}_1")
+    utils.Cache.delete_cache(f"profile_cache_{user_id}_0")
+
     return Response(
         {"success": "Account successfully changed!"}, status=status.HTTP_200_OK
     )
@@ -175,15 +170,23 @@ def api_change_user_register(request: Request, user_id: int) -> Response:
 @api_view(http_method_names=["GET"])
 @permission_classes([IsAuthenticated])
 def api_all_profiles(request: Request) -> Response:
-    profiles = models.Profile.objects.all()
-    profiles_serializer = output_serializers.ProfileSimpleSerializer(
-        profiles, many=True if isinstance(profiles, QuerySet) else False
-    ).data
-    profiles_serializer_with_cache = utils.Cache.get_cache(
-        key="profiles_cache", query=lambda: profiles_serializer, timeout=10
+    cache_key = "profiles_cache"
+
+    def load_data():
+        profiles = models.Profile.objects.all()
+        profiles_serializer = output_serializers.ProfileSimpleSerializer(
+            profiles, many=True if isinstance(profiles, QuerySet) else False
+        ).data
+        return profiles_serializer
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
+
     return Response(
-        data={"data": profiles_serializer_with_cache}, status=status.HTTP_200_OK
+        data={"data": data}, status=status.HTTP_200_OK
     )
 
 
@@ -193,21 +196,59 @@ def api_all_profiles(request: Request) -> Response:
 @api_view(http_method_names=["GET"])
 @permission_classes([IsAuthenticated])
 def api_user_profile(request: Request, user_id: int, is_all_data: int = 1) -> Response:
-    user = User.objects.get(id=user_id)
-    profile = models.Profile.objects.get(user=user)
-    if bool(is_all_data):
-        profile_serializer = output_serializers.ProfileSimpleSerializer(
-            profile, many=True if isinstance(profile, QuerySet) else False
+    cache_key = f"profile_cache_{user_id}_{is_all_data}"
+
+    def load_data():
+        user = User.objects.get(id=user_id)
+        profile = models.Profile.objects.get(user=user)
+        if bool(is_all_data):
+            profile_serializer = output_serializers.ProfileSimpleSerializer(
+                profile, many=True if isinstance(profile, QuerySet) else False
+            ).data
+            return profile_serializer
+        else:
+            return profile.name
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
+    )   
+    return Response(data={"data": data}, status=status.HTTP_200_OK)
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+
+
+@api_view(http_method_names=["GET"])
+@permission_classes([IsAuthenticated])
+def api_user_friends(request: Request, user_id: int) -> Response:
+    cache_key = f"friend_cache_{user_id}"
+
+    def load_data():
+        user = User.objects.get(id=user_id)
+
+        friend_users = User.objects.filter(
+            Q(sender__to_user=user, sender__status="friends")
+            | Q(recipient__from_user=user, recipient__status="friends")
+        ).distinct()
+
+        friend_profiles = models.Profile.objects.filter(user__in=friend_users).order_by(
+            "name"
+        )
+
+        friend_serializer = output_serializers.FriendSimpleSerializer(
+            friend_profiles, many=True
         ).data
-        profile_serializer_with_cache = utils.Cache.get_cache(
-            key=f"profile_cache_{user_id}_{is_all_data}",
-            query=lambda: profile_serializer,
-            timeout=3,
-        )
-        return Response(
-            data={"data": profile_serializer_with_cache}, status=status.HTTP_200_OK
-        )
-    return Response(data={"data": profile.name}, status=status.HTTP_200_OK)
+        return friend_serializer
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
+    )
+
+    return Response({"data": data}, status=status.HTTP_200_OK)
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -215,90 +256,74 @@ def api_user_profile(request: Request, user_id: int, is_all_data: int = 1) -> Re
 
 @api_view(http_method_names=["GET"])
 @permission_classes([IsAuthenticated])
-def api_user_friends(request, user_id: int):
-    user = User.objects.get(id=user_id)
+def api_user_request_friends(request: Request, user_id: int) -> Response:
+    cache_key = f"friend_requests_{user_id}"
 
-    friend_users = User.objects.filter(
-        Q(sender__to_user=user, sender__status="friends")
-        | Q(recipient__from_user=user, recipient__status="friends")
-    ).distinct()
+    def load_data():
+        user = User.objects.get(id=user_id)
+        friend_users = User.objects.filter(
+            sender__to_user=user, sender__status="request"
+        ).distinct()
 
-    friend_profiles = models.Profile.objects.filter(user__in=friend_users).order_by(
-        "name"
-    )
-
-    friend_serializer = output_serializers.FriendSimpleSerializer(
-        friend_profiles, many=True
-    ).data
-    friend_serializer_with_cache = utils.Cache.get_cache(
-        key=f"friend_cache_{user_id}", query=lambda: friend_serializer, timeout=1
-    )
-
-    return Response({"data": friend_serializer_with_cache}, status=status.HTTP_200_OK)
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
-
-
-@api_view(http_method_names=["GET"])
-@permission_classes([IsAuthenticated])
-def api_user_request_friends(request, user_id: int):
-    user = User.objects.get(id=user_id)
-
-    friend_users = User.objects.filter(
-        sender__to_user=user, sender__status="request"
-    ).distinct()
-
-    friend_profiles = models.Profile.objects.filter(user__in=friend_users).order_by(
-        "name"
-    )
-
-    friend_serializer = output_serializers.FriendSimpleSerializer(
-        friend_profiles, many=True
-    ).data
-    friend_serializer_with_cache = utils.Cache.get_cache(
-        key=f"friend_requests_{user_id}", query=lambda: friend_serializer, timeout=1
+        friend_profiles = models.Profile.objects.filter(user__in=friend_users).order_by(
+            "name"
+        )
+        friend_serializer = output_serializers.FriendSimpleSerializer(
+            friend_profiles, many=True
+        ).data
+        return friend_serializer
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
 
     return Response(
-        {"data": friend_serializer_with_cache}, status=status.HTTP_200_OK
+        {"data": data}, status=status.HTTP_200_OK
     )
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
-
 
 @extend_schema(
     request=input_serializers.FriendsStatusChangerSerializer,
-    summary="Запрос у пользователя добавления в друзья",
+    summary="Запрос на добавление в друзья",
 )
-@api_view(http_method_names=["POST"])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def api_add_friends(request: Request) -> Response:
     serializer = input_serializers.FriendsStatusChangerSerializer(data=request.data)
-    if serializer.is_valid():
-        to_user_id = serializer.validated_data["from_user"]
-        from_user_id = serializer.validated_data["to_user"]
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    to_user_id = serializer.validated_data["from_user"]
+    from_user_id = serializer.validated_data["to_user"]
+
     from_user = User.objects.get(id=from_user_id)
     to_user = User.objects.get(id=to_user_id)
+
     friend_exists = models.Friends.objects.filter(
-        Q(from_user=from_user, to_user=to_user)
-        | Q(from_user=to_user, to_user=from_user),
-        status__in=["request", "friends"],
+        Q(from_user=from_user, to_user=to_user) |
+        Q(from_user=to_user, to_user=from_user),
+        status__in=["request", "friends"]
     ).exists()
 
-    if not friend_exists:
-        models.Friends.objects.create(
-            from_user=from_user, to_user=to_user, status="request"
-        )
+    if friend_exists:
         return Response(
-            data={"message": "Request successfully sent!"}, status=status.HTTP_200_OK
+            {"message": "You are already friends or a request has been sent"},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
-    return Response(
-        data={"message": "You are already friends or a question has been sent to you"},
-        status=status.HTTP_400_BAD_REQUEST,
-    )
+    models.Friends.objects.create(from_user=from_user, to_user=to_user, status="request")
+
+    utils.Cache.delete_cache(f"friend_cache_{from_user_id}")
+    utils.Cache.delete_cache(f"friend_cache_{to_user_id}")
+    utils.Cache.delete_cache(f"friend_requests_{from_user_id}")
+    utils.Cache.delete_cache(f"friend_requests_{to_user_id}")
+
+    return Response({"message": "Request successfully sent!"}, status=status.HTTP_200_OK)
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -323,13 +348,19 @@ def api_accept_request_to_friends(request: Request) -> Response:
         )
         friendship.status = "friends"
         friendship.save()
+
+        utils.Cache.delete_cache(f"friend_cache_{from_user_id}")
+        utils.Cache.delete_cache(f"friend_cache_{to_user_id}")
+        utils.Cache.delete_cache(f"friend_requests_{from_user_id}")
+        utils.Cache.delete_cache(f"friend_requests_{to_user_id}")
+
         return Response(
             data={"message": "Friend successfully added! "},
             status=status.HTTP_201_CREATED,
         )
 
     except models.Friends.DoesNotExist:
-        return Response(data={"message": "Error, "}, status=status.HTTP_404_NOT_FOUND)
+        return Response(data={"message": "Friendsheep DoesNotExist"}, status=status.HTTP_404_NOT_FOUND)
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -355,6 +386,12 @@ def api_delete_friend(request: Request) -> Response:
             status__in=["request", "friends"],
         )
         friendship.delete()
+
+        utils.Cache.delete_cache(f"friend_cache_{from_user_id}")
+        utils.Cache.delete_cache(f"friend_cache_{to_user_id}")
+        utils.Cache.delete_cache(f"friend_requests_{from_user_id}")
+        utils.Cache.delete_cache(f"friend_requests_{to_user_id}")
+
         return Response(
             data={"message": "Friend or Request successfully deleted! "},
             status=status.HTTP_204_NO_CONTENT,
@@ -365,60 +402,34 @@ def api_delete_friend(request: Request) -> Response:
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
 
-
-@api_view(http_method_names=["GET"])
-@permission_classes([IsAuthenticated])
-def api_all_user_workout(request: Request, user_id: int) -> Response:
-    user = User.objects.get(id=user_id)
-    workouts_data = models.Workout.objects.filter(user=user)
-    workouts_data_serializer = output_serializers.WorkoutListSimpleSerializer(
-        workouts_data, many=True if isinstance(workouts_data, QuerySet) else False
-    ).data
-    workouts_data_serializer_with_cache = utils.Cache.get_cache(
-        key=f"workouts_{user_id}",
-        query=lambda: workouts_data_serializer,
-        timeout=3 ,
-    )
-    return Response(
-        data={"data": workouts_data_serializer_with_cache}, status=status.HTTP_200_OK
-    )
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def api_all_planned_user_workout(request: Request, user_id: int, is_active: int = 1) -> Response:
-    user = User.objects.get(id=user_id)
-    workouts_qs = models.Workout.objects.filter(user=user, is_active=bool(is_active))
-
-    # 🔹 Настраиваем пагинатор
-    paginator = PageNumberPagination()
-    paginator.page_size = int(request.GET.get("page_size", 10))  # по умолчанию 10
-    paginated_workouts = paginator.paginate_queryset(workouts_qs, request)
-
-    # 🔹 Сериализация
-    serializer = output_serializers.PlannedWorkoutListSerializer(paginated_workouts, many=True)
-
-    # 🔹 Кэшируем данные страницы
     page_number = request.GET.get("page", 1)
     cache_key = f"workouts_planned_{user_id}_{is_active}_page_{page_number}"
-    data_with_cache = utils.Cache.get_cache(
-        key=cache_key,
-        query=lambda: serializer.data,
-        timeout=10,
+
+    def load_data():
+        user = User.objects.get(id=user_id)
+        workouts_qs = models.Workout.objects.filter(user=user, is_active=bool(is_active))
+
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.GET.get("page_size", 10))  
+        paginated_workouts = paginator.paginate_queryset(workouts_qs, request)
+        workout_qs_serializer = output_serializers.PlannedWorkoutListSerializer(paginated_workouts, many=True)
+        response_data = {
+            "count": workouts_qs.count(),
+            "total_pages": paginator.page.paginator.num_pages if paginated_workouts else 1,
+            "current_page": int(page_number),
+            "results": workout_qs_serializer
+        }
+        return response_data
+
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
-
-    # 🔹 Формируем кастомный response
-    response_data = {
-        "count": workouts_qs.count(),
-        "total_pages": paginator.page.paginator.num_pages if paginated_workouts else 1,
-        "current_page": int(page_number),
-        "results": data_with_cache
-    }
-
-    return Response(data={"data":response_data}, status=status.HTTP_200_OK)
+    return Response(data={"data":data}, status=status.HTTP_200_OK)
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -427,17 +438,23 @@ def api_all_planned_user_workout(request: Request, user_id: int, is_active: int 
 @api_view(http_method_names=["GET"])
 @permission_classes([IsAuthenticated])
 def api_recommended_workouts(request: Request) -> Response:
-    workouts_data = models.Workout.objects.filter(is_recommended=True).order_by("id")
-    workouts_data_serializer = output_serializers.PlannedWorkoutListSerializer(
-        workouts_data, many=True if isinstance(workouts_data, QuerySet) else False
-    ).data
-    workouts_data_serializer_with_cache = utils.Cache.get_cache(
-        key="workouts_recommend",
-        query=lambda: workouts_data_serializer,
-        timeout=3 ,
+    cache_key = "workouts_recommend"
+
+    def load_data():
+        workouts_data = models.Workout.objects.filter(is_recommended=True).order_by("id")
+        workouts_data_serializer = output_serializers.PlannedWorkoutListSerializer(
+            workouts_data, many=True if isinstance(workouts_data, QuerySet) else False
+        ).data
+        return workouts_data_serializer
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
+
     return Response(
-        data={"data": workouts_data_serializer_with_cache}, status=status.HTTP_200_OK
+        data={"data": data}, status=status.HTTP_200_OK
     )
 
 
@@ -447,17 +464,23 @@ def api_recommended_workouts(request: Request) -> Response:
 @api_view(http_method_names=["GET"])
 @permission_classes([IsAuthenticated])
 def api_user_workout_info(request: Request, workout_id: int) -> Response:
-    workout_data = models.Workout.objects.get(id=int(workout_id))
-    workout_data_serializer = output_serializers.WorkoutInfoHardSerializer(
-        workout_data, many=True if isinstance(workout_data, QuerySet) else False
-    ).data
-    workout_data_serializer_with_cache = utils.Cache.get_cache(
-        key=f"workout_info_{workout_id}",
-        query=lambda: workout_data_serializer,
-        timeout=3 ,
+    cache_key = f"workout_info_{workout_id}"
+
+    def load_data():
+        workout_data = models.Workout.objects.get(id=int(workout_id))
+        workout_data_serializer = output_serializers.WorkoutInfoHardSerializer(
+            workout_data, many=True if isinstance(workout_data, QuerySet) else False
+        ).data
+        return workout_data_serializer
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
+
     return Response(
-        data={"data": workout_data_serializer_with_cache}, status=status.HTTP_200_OK
+        data={"data": data}, status=status.HTTP_200_OK
     )
 
 
@@ -473,7 +496,19 @@ def api_user_workout_info(request: Request, workout_id: int) -> Response:
 def api_create_workout_plan(request: Request) -> Response:
     serializer = input_serializers.WorkoutSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        workout = serializer.save()
+        user_id = workout.user.id
+        is_active_values = [0, 1] 
+        page_numbers = range(1, 20)  
+
+        for is_active in is_active_values:
+            for page in page_numbers:
+                key = f"workouts_planned_{user_id}_{is_active}_page_{page}"
+                utils.Cache.delete_cache(key)
+
+        utils.Cache.delete_cache(f"workouts_{user_id}")
+        utils.Cache.delete_cache(f"user_exercises_{user_id}")
+
         return Response(
             {"message": "Workout successfully created"}, status=status.HTTP_201_CREATED
         )
@@ -489,18 +524,23 @@ def api_user_exercises(
     request: Request,
     user_id: int,
 ) -> Response:
-    user = User.objects.get(id=user_id)
-    user_exercises = models.Exercises.objects.filter(user=user)
-    user_exercises_serializer = output_serializers.UserExercisesSimpleSerializer(
-        user_exercises, many=True if isinstance(user_exercises, QuerySet) else False
-    ).data
-    user_exercises_serializer_with_cache = utils.Cache.get_cache(
-        key=f"user_exercises_{user_id}",
-        query=lambda: user_exercises_serializer,
-        timeout=3 ,
+    cache_key = f"user_exercises_{user_id}"
+    
+    def load_data():
+        user = User.objects.get(id=user_id)
+        user_exercises = models.Exercises.objects.filter(user=user)
+        user_exercises_serializer = output_serializers.UserExercisesSimpleSerializer(
+            user_exercises, many=True if isinstance(user_exercises, QuerySet) else False
+        ).data
+        return user_exercises_serializer
+    
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
     return Response(
-        data={"data": user_exercises_serializer_with_cache}, status=status.HTTP_200_OK
+        data={"data": data}, status=status.HTTP_200_OK
     )
 
 
@@ -513,17 +553,22 @@ def api_user_planned_workout_info(
     request: Request,
     workout_id: int,
 ) -> Response:
-    workout_data = models.Workout.objects.get(id=int(workout_id))
-    workout_data_serializer = output_serializers.PlannedWorkoutInfoHardSerializer(
-        workout_data, many=True if isinstance(workout_data, QuerySet) else False
-    ).data
-    workout_data_serializer_with_cache = utils.Cache.get_cache(
-        key=f"workout_planned_{workout_id}",
-        query=lambda: workout_data_serializer,
-        timeout=3,
+    cache_key = f"workout_planned_{workout_id}"
+   
+    def load_data():
+        workout_data = models.Workout.objects.get(id=int(workout_id))
+        workout_data_serializer = output_serializers.PlannedWorkoutInfoHardSerializer(
+            workout_data, many=True if isinstance(workout_data, QuerySet) else False
+        ).data
+        return workout_data_serializer
+
+    data = utils.Cache.get_cache(
+        key = cache_key,
+        query=load_data,
+        timeout=60*3
     )
     return Response(
-        data={"data": workout_data_serializer_with_cache}, status=status.HTTP_200_OK
+        data={"data": data}, status=status.HTTP_200_OK
     )
 
 
@@ -539,7 +584,20 @@ def api_user_planned_workout_info(
 def api_input_workout_data(request: Request) -> Response:
     serializer = input_serializers.FactualWorkoutInputSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        workout = serializer.save()
+        user_id = workout.user.id
+        
+        if not settings.DEBUG:
+            r = redis.Redis.from_url(settings.CACHES['default']['LOCATION'])
+            pattern = f"exercise_info_{user_id}_*"
+            for key in r.scan_iter(pattern):
+                r.delete(key)
+        utils.Cache.delete_cache(f"stats_{user_id}_week")
+        utils.Cache.delete_cache(f"stats_{user_id}_month")
+        utils.Cache.delete_cache(f"stats_{user_id}_all_time")
+        utils.Cache.delete_cache(f"workout_info_{workout.id}")
+        utils.Cache.delete_cache(f"user_infromation_{workout.user.id}")
+
         return Response(
             {"message": "Workout successfully input"}, status=status.HTTP_201_CREATED
         )
@@ -596,76 +654,90 @@ def api_repeat_workout(request: Request, user_id: int, workout_id: int) -> Respo
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def api_workout_info(request: Request, workout_id: int) -> Response:
-    workout_data = models.Workout.objects.get(id=workout_id)
-    workout_data_serializer = output_serializers.WorkoutAllInfoHardSerializer(
-        workout_data, many=True if isinstance(workout_data, QuerySet) else False
-    ).data
-    workout_data_serializer_with_cache = utils.Cache.get_cache(
-        key=f"workout_info_{workout_id}",
-        query=lambda: workout_data_serializer,
-        timeout=3,
+    cache_key = f"workout_info_{workout_id}"
+    def load_data():
+        workout_data = models.Workout.objects.get(id=workout_id)
+        workout_data_serializer = output_serializers.WorkoutAllInfoHardSerializer(
+            workout_data, many=True if isinstance(workout_data, QuerySet) else False
+        ).data
+        return workout_data_serializer
+
+    data = utils.Cache.get_cache(
+        key=cache_key,
+        query=load_data,
+        timeout=60*3
     )
     return Response(
-        data={"data": workout_data_serializer_with_cache}, status=status.HTTP_200_OK
+        data={"data": data}, status=status.HTTP_200_OK
     )
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
 
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def api_workouts_statistics(request: Request, user_id) -> Response:
     filter = request.query_params.get("filter", "all_time")
-    user = User.objects.get(id=int(user_id))
-    now = timezone.now()
+    cache_key = f"stats_{user_id}_{filter}"
 
-    if filter == "week":
-        date_ago = now - timedelta(days=7)
-        workouts = models.Workout.objects.filter(
-            user=user, start_time__range=(date_ago, now)
+    def load_data():
+        user = User.objects.get(id=int(user_id))
+        now = timezone.now()
+
+        if filter == "week":
+            date_ago = now - timedelta(days=7)
+            workouts = models.Workout.objects.filter(
+                user=user, start_time__range=(date_ago, now)
+            )
+        elif filter == "month":
+            date_ago = now - timedelta(days=30)
+            workouts = models.Workout.objects.filter(
+                user=user, start_time__range=(date_ago, now)
+            )
+        elif filter == "all_time":
+            workouts = models.Workout.objects.filter(user=user)
+        else:
+            return {"error": "Unknown filter"}
+
+        valid_approaches = models.FactualApproach.objects.filter(
+            exercise__workout__in=workouts
+        ).filter(
+            Q(factual_time__isnull=False)
+            | Q(speed_exercise_equipment__isnull=False)
+            | Q(weight_exercise_equipment__isnull=False)
+            | Q(count_approach__isnull=False)
         )
-    elif filter == "month":
-        date_ago = now - timedelta(days=30)
-        workouts = models.Workout.objects.filter(
-            user=user, start_time__range=(date_ago, now)
+
+        stats = (
+            valid_approaches.values(name=F("exercise__name"))
+            .annotate(
+                total_approaches=Count("id"),
+                max_count=Max("count_approach"),
+                max_speed=Max("speed_exercise_equipment"),
+                max_weight=Max("weight_exercise_equipment"),
+                max_time=Max("factual_time"),
+                avg_time=Avg("factual_time"),
+            )
+            .order_by("name")
         )
-    elif filter == "all_time":
-        workouts = models.Workout.objects.filter(user=user)
-    else:
+
+        stats_serializer = output_serializers.StatisticsWorkoutSerializer(
+            stats, many=True
+        ).data
+
+        return stats_serializer
+
+    data = utils.Cache.get_cache(
+        key=cache_key,
+        query=load_data,
+        timeout=60*3
+    )
+
+    if data == {"error": "Unknown filter"}:
         return Response({"error": "Unknown filter"}, status=status.HTTP_400_BAD_REQUEST)
 
-    valid_approaches = models.FactualApproach.objects.filter(
-        exercise__workout__in=workouts
-    ).filter(
-        Q(factual_time__isnull=False)
-        | Q(speed_exercise_equipment__isnull=False)
-        | Q(weight_exercise_equipment__isnull=False)
-        | Q(count_approach__isnull=False)
-    )
+    return Response({"data": data}, status=status.HTTP_200_OK)
 
-    stats = (
-        valid_approaches.values(name=F("exercise__name"))
-        .annotate(
-            total_approaches=Count("id"),
-            max_count=Max("count_approach"),
-            max_speed=Max("speed_exercise_equipment"),
-            max_weight=Max("weight_exercise_equipment"),
-            max_time=Max("factual_time"),
-            avg_time=Avg("factual_time"),
-        )
-        .order_by("name")
-    )
-
-    stats_serializer = output_serializers.StatisticsWorkoutSerializer(
-        stats, many=True
-    ).data
-
-    stats_serializer_with_cache = utils.Cache.get_cache(
-        key=f"stats_{user_id}_{filter}", query=lambda: stats_serializer, timeout=3 
-    )
-
-    return Response({"data": stats_serializer_with_cache}, status=status.HTTP_200_OK)
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -702,39 +774,43 @@ def api_create_purpose(request: Request, user_id: int) -> Response:
 @api_view(http_method_names=["GET"])
 @permission_classes([IsAuthenticated])
 def api_user_purpose(request: Request, user_id: int) -> Response:
-    try:
+    cache_key = f"user_information_{user_id}"
+
+    def load_data():
         user = User.objects.get(id=user_id)
         now = timezone.now()
-        purpose = models.WorkoutPurpose.objects.get(
-            user=user, start_time__year=now.year, start_time__month=now.month
-        )
-        workouts_count = models.Workout.objects.filter(
-            user=user, start_time__range=(purpose.start_time, purpose.finish_time)
-        ).count()
+        try:
+            purpose = models.WorkoutPurpose.objects.get(
+                user=user, start_time__year=now.year, start_time__month=now.month
+            )
+            workouts_count = models.Workout.objects.filter(
+                user=user, start_time__range=(purpose.start_time, purpose.finish_time)
+            ).count()
 
-        response_data = {
-            "workouts_count": workouts_count,
-            "workouts_count_purpose": purpose.purpose,
-        }
-        response_data_with_cache = utils.Cache.get_cache(
-            key=f"user_infromation_{user_id}",
-            query=lambda: response_data,
-            timeout=3 ,
-        )
-        return Response(
-            {"data": response_data_with_cache},
-            status=status.HTTP_200_OK,
-        )
-    except ObjectDoesNotExist:
+            return {
+                "workouts_count": workouts_count,
+                "workouts_count_purpose": purpose.purpose,
+            }
+        except ObjectDoesNotExist:
+            return None
+
+    data = utils.Cache.get_cache(
+        key=cache_key,
+        query=load_data,
+        timeout=60 * 3,
+    )
+
+    if data is None:
         return Response(
             {"message": "Purpose not found for this month."},
             status=status.HTTP_404_NOT_FOUND,
         )
-    except Exception as e:
-        return Response(
-            {"message": f"Server Error!{e}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+
+    return Response(
+        {"data": data},
+        status=status.HTTP_200_OK,
+    )
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -743,8 +819,8 @@ def api_user_purpose(request: Request, user_id: int) -> Response:
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def api_exercise_information(request, user_id: int):
-    exercise_name = request.query_params.get("exercise_name", "Жим лежа")
-    cache_key = f"exercise_info_{user_id}_{exercise_name}"
+    exercise_name = request.query_params.get("exercise_name", " ")
+    cache_key = f"exercise_info_{user_id}_{slugify(exercise_name)}"
 
     def load_data():
         user = User.objects.get(id=user_id)
@@ -819,6 +895,6 @@ def api_exercise_information(request, user_id: int):
             "last_workout_date": last_date,
         }
 
-    data = utils.Cache.get_cache(key=cache_key, query=load_data, timeout=60 * 3)
+    data = utils.Cache.get_cache(key=cache_key, query=load_data, timeout=60*3)
 
     return Response({"data": data}, status=status.HTTP_200_OK)

@@ -190,7 +190,7 @@ export default function FriendsPage() {
             )}
           </div>
         
-        {hasRequests && hasProfiles? (
+        {hasRequests && hasProfiles && !friends.load ? (
           <div className="w-full flex flex-col gap-y-4">
             <h1 className="text-xl md:text-2xl font-bold text-slate-100 mb-4">
               Запросы в друзья
@@ -201,11 +201,13 @@ export default function FriendsPage() {
                 key={friend.friend_id}
                 className="flex items-center border-2 border-slate-100 p-4 rounded-2xl shadow gap-4 w-full max-w-md  justify-start"
               >
-                <img
-                  src={constants.host + friend.friend_avatar}
-                  alt="avatar"
-                  className="w-24 h-24 rounded-full object-cover "
-                />
+              <div className="w-24 h-24 flex-shrink-0">
+                  <img
+                    src={constants.host + friend.friend_avatar}
+                    alt="avatar"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                </div>
                 <div className="flex justify-between w-full">
                   <p className="text-lg font-semibold text-slate-100">
                     {friend.friend_name || "Без имени"} {friend.friend_surname || ""}
@@ -233,6 +235,8 @@ export default function FriendsPage() {
             ))}
           </div>
         ) : ''}
+
+
            {hasFriends && hasProfiles && !requests.load? (
           <h1 className="text-xl md:text-2xl font-bold text-slate-100 mb-4">
             Мои друзья
@@ -248,15 +252,18 @@ export default function FriendsPage() {
               friends.data.map((friend: any) => (
                 <div
                   key={friend.friend_id}
-                  className="flex items-center border-2 border-slate-100 p-4 rounded-2xl shadow gap-4 w-full max-w-md  justify-start"
+                  className="flex items-center border-2 border-slate-100 p-4 rounded-2xl shadow gap-4 w-full max-w-md justify-start"
                 >
-                  <img
-                    src={constants.host + friend.friend_avatar}
-                    alt="avatar"
-                    className="w-24 h-24 object-cover rounded-full"
-                  />
+                  <div className="w-24 h-24 flex-shrink-0">
+                    <img
+                      src={constants.host + friend.friend_avatar}
+                      alt="avatar"
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+
                   <div className="flex flex-col gap-y-2 w-full">
-                    <div className="flex w-full justify-between text-m ">
+                    <div className="flex w-full justify-between text-m">
                       <p className="font-semibold text-slate-100">
                         {friend.friend_name || "Без имени"} {friend.friend_surname || ""}
                       </p>
@@ -273,6 +280,7 @@ export default function FriendsPage() {
               ""
             )}
           </div>
+
 
 
         </div>

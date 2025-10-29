@@ -1,11 +1,11 @@
 from django.core.cache import caches
 import os, random
 
-
 class Cache:
 
     RedisCache = caches["default"]
 
+    @staticmethod
     def get_cache(
         key: str,
         query: callable = lambda: any,
@@ -17,6 +17,14 @@ class Cache:
             data = query()
             cache.set(key, data, timeout)
         return data
+
+    @staticmethod
+    def delete_cache(
+        key: str,
+        cache: any = RedisCache
+    ) -> None:
+        cache.delete(key)
+
 
 
 def get_randow_workout_image():

@@ -141,7 +141,7 @@ export default function WorkoutPage() {
       {/* Заголовок */}
       <div className="flex items-center justify-around flex-wrap text-center gap-3">
         <div className="flex items-end justify-center text-sm md:text-lg font-semibold leading-6 text-cyan-600 hover:text-gray-600">
-          <span className="text-3xl md:text-5xl">Fitnes</span>
+          <span className="text-3xl md:text-5xl">Fitness</span>
           <span className="text-white">helper</span>
         </div>
         <h1 className="text-2xl md:text-3xl font-bold text-slate-100">{plan.name}</h1>

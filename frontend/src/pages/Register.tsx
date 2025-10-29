@@ -116,7 +116,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <div className="flex items-end justify-center text-l font-semibold leading-6 text-cyan-600 hover:text-gray-600">
-        <span className="text-5xl">Fitnes</span>
+        <span className="text-5xl">Fitness</span>
         <span className="text-white">helper</span>
       </div>
       <h2 className="mt-4 text-2xl sm:text-3xl font-semibold text-white text-center">

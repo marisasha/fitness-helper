@@ -52,7 +52,7 @@ export default function Page() {
             <div className="sm:mx-auto sm:w-full sm:max-w-xl mt-28 flex flex-col items-center justify-center">
             
                 <div className="flex items-end text-l font-semibold leading-6 text-cyan-600 hover:text-gray-600 justify-center">
-                    <span className="text-5xl">Fitnes</span>
+                    <span className="text-5xl">Fitness</span>
                     <span className="text-slate-100">helper</span>
                 </div>
 

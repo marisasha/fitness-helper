@@ -14,4 +14,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn django_settings.wsgi:application --bind 0.0.0.0:8000 --workers 3"]
+CMD ["sh", "-c", "\
+  python manage.py migrate && \
+  gunicorn django_settings.wsgi:application \
+  --bind 0.0.0.0:8000 \
+  --workers 1 \
+  --threads 2 \
+  --timeout 60 \
+  --max-requests 300 \
+  --max-requests-jitter 30"]

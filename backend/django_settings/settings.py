@@ -76,36 +76,36 @@ DATABASES = {
 
 
 
-# if DEBUG:
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "django_ram_cache_table",
-    },
-    "database_cache": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "django_cache_table",
-        "TIMEOUT": "120",
-        "OPTIONS": {
-            "MAX_ENTIES": 200,
+if DEBUG:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "django_ram_cache_table",
         },
-    },
-}
-# else:
-#     CACHES = {
-#         "default": {
-#             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-#             "LOCATION": os.getenv("REDIS_LOCATION"),
-#         },
-#         "database_cache": {
-#             "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-#             "LOCATION": "django_cache_table",
-#             "TIMEOUT": 120,
-#             "OPTIONS": {
-#                 "MAX_ENTRIES": 200,
-#             },
-#         },
-#     }
+        "database_cache": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache_table",
+            "TIMEOUT": "120",
+            "OPTIONS": {
+                "MAX_ENTIES": 200,
+            },
+        },
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.getenv("REDIS_LOCATION"),
+        },
+        "database_cache": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache_table",
+            "TIMEOUT": 120,
+            "OPTIONS": {
+                "MAX_ENTRIES": 200,
+            },
+        },
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [

@@ -1,17 +1,4 @@
-version: '3.8'
-
-services:
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    restart: always
-
-  web:
+web:
     build: .
     container_name: web
     ports:
@@ -24,23 +11,32 @@ services:
       - media:/app/media
     depends_on:
       - db
+      - redis
+    mem_limit: 280m
     restart: always
 
-  nginx:
-    image: nginx:latest
-    container_name: nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      - /etc/letsencrypt/:/etc/letsencrypt/
-      - ./react/build:/app/react/build   
-      - static:/app/static
-      - media:/app/media
-    depends_on:
-      - web
-    restart: always
+nginx:
+  image: nginx:latest
+  container_name: nginx
+  ports:
+    - "80:80"
+    - "443:443"
+  volumes:
+    - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    - /etc/letsencrypt/:/etc/letsencrypt/
+    - ./staticroot:/app/static
+    - ./react/build:/app/react
+    - media:/app/media
+  depends_on:
+    - web
+  mem_limit: 50m
+  restart: always
+
+redis:
+  image: redis:7-alpine
+  ports:
+    - "6379:6379"
+  mem_limit: 50m
 
 volumes:
   postgres_data:
