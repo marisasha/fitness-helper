@@ -83,7 +83,19 @@ export default function ProfilePage() {
                 to={`/workouts/completed-workouts/${user.user_id}`}
                 className="w-full sm:w-36 md:w-64 bg-cyan-600 text-slate-100 px-3 py-2 rounded-xl shadow hover:bg-slate-100 hover:text-cyan-600 text-center font-semibold text-sm sm:text-base"
               >
-                История тренировок
+                Мои тренировки
+              </Link>
+              <Link
+                to="/profile/statuses"
+                className="w-full sm:w-36 md:w-64 bg-cyan-600 text-slate-100 px-3 py-2 rounded-xl shadow hover:bg-slate-100 hover:text-cyan-600 text-center font-semibold text-sm sm:text-base"
+              >
+                Мои достижения
+              </Link>
+              <Link
+                to="/profile/stars-logs"
+                className="w-full sm:w-36 md:w-64 bg-cyan-600  text-slate-100 px-3 py-2 rounded-xl shadow hover:bg-slate-100 hover:text-cyan-600 text-center font-semibold text-sm sm:text-base"
+              >
+                Мои награды
               </Link>
               <Link
                 to="/friends"

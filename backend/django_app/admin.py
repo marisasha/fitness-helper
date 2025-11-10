@@ -10,4 +10,8 @@ admin.site.register(models.FactualExercise)
 admin.site.register(models.Workout)
 admin.site.register(models.Exercises)
 admin.site.register(models.WorkoutPurpose)
+admin.site.register(models.FitnesHelperExercise)
+admin.site.register(models.ExerciseRewardStatuses)
+admin.site.register(models.UserRewardStatuses)
+admin.site.register(models.UserRewardsLogs)
 

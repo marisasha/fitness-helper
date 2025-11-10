@@ -1,5 +1,5 @@
-from django.contrib.auth.models import User, Group
-from rest_framework import serializers, pagination
+from django.contrib.auth.models import User
+from rest_framework import serializers
 from django_app import models,utils
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -35,6 +35,7 @@ class FriendsStatusChangerSerializer(serializers.Serializer):
     to_user = serializers.IntegerField()
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+
 class PlannedApproachSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.PlannedApproach
@@ -54,44 +55,53 @@ class PlannedExerciseSerializer(serializers.ModelSerializer):
         fields = ["name", "approaches"]
 
 
-
 class WorkoutSerializer(serializers.ModelSerializer):
     exercises = PlannedExerciseSerializer(many=True)
 
     class Meta:
         model = models.Workout
-        fields = ["name", "user" ,"type", "exercises","avatar"]
+        fields = ["name", "user", "type", "exercises", "avatar"]
 
     def create(self, validated_data):
+        workout = None
         try:
             exercises_data = validated_data.pop("exercises", [])
             workout = models.Workout.objects.create(**validated_data)
-            workout.avatar = utils.get_randow_workout_image()
+            workout.avatar = utils.get_random_workout_image()
             workout.save()
-            
+
             for ex in exercises_data:
-                models.Exercises.objects.get_or_create(
-                    user=workout.user,
-                    name=ex["name"]
-                )   
+                exercise_name = ex.get("name")
+                if exercise_name:
+                    models.Exercises.objects.get_or_create(
+                        user=workout.user,
+                        name=exercise_name
+                    )
 
             for ed in exercises_data:
                 approaches_data = ed.pop("approaches", [])
-                exercise = models.PlannedExercise.objects.create(
-                    workout=workout, **ed
+                planned_exercise = models.PlannedExercise.objects.create(
+                    workout=workout,
+                    name=ed.get("name", "Без названия")
                 )
-                models.PlannedApproach.objects.bulk_create(
-                    [models.PlannedApproach(exercise=exercise, **approach) for approach in approaches_data]
-                )
+                if approaches_data:
+                    models.PlannedApproach.objects.bulk_create([
+                        models.PlannedApproach(exercise=planned_exercise, **approach)
+                        for approach in approaches_data
+                    ])
+
             return workout
+
         except Exception as e:
-            workout.delete()
             print(e)
-            raise serializers.ValidationError(
-                {"message": f" Error with create Workout!"}
-            )
+            if workout and workout.id:
+                workout.delete()
+            raise Exception(str(e))
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+from rest_framework import serializers
+from . import models
 
 class FactualApproachSerializer(serializers.ModelSerializer):
     class Meta:
@@ -110,44 +120,70 @@ class FactualExerciseInputSerializer(serializers.ModelSerializer):
         model = models.FactualExercise
         fields = ["name", "approaches"]
 
-
 class FactualWorkoutInputSerializer(serializers.Serializer):
     workout_id = serializers.IntegerField()
-    start_time = serializers.DateTimeField()   
-    finish_time = serializers.DateTimeField()  
+    start_time = serializers.DateTimeField()
+    finish_time = serializers.DateTimeField()
     exercises = FactualExerciseInputSerializer(many=True)
 
     def create(self, validated_data):
-        workout_id = validated_data["workout_id"]
-        start_time = validated_data.get("start_time")
-        finish_time = validated_data.get("finish_time")
-        exercises_data = validated_data.pop("exercises", [])
+        try:
+            workout_id = validated_data["workout_id"]
+            start_time = validated_data.get("start_time")
+            finish_time = validated_data.get("finish_time")
+            exercises_data = validated_data.pop("exercises", [])
 
-        workout = models.Workout.objects.get(id=workout_id)
-        workout.is_active = False
-        if start_time:
-            workout.start_time = start_time
-        if finish_time:
-            workout.finish_time = finish_time
-        workout.save()
+            workout = models.Workout.objects.get(id=workout_id)
+            workout.is_active = False
+            if start_time:
+                workout.start_time = start_time
+            if finish_time:
+                workout.finish_time = finish_time
+            workout.save()
 
-        for ed in exercises_data:
-            approaches_data = ed.pop("approaches", [])
-            factual_exercise = models.FactualExercise.objects.create(
-                workout=workout,
-                name=ed["name"],
+            for exercise_data in exercises_data:
+                approaches_data = exercise_data.pop("approaches", [])
+                factual_exercise = models.FactualExercise.objects.create(
+                    workout=workout,
+                    name=exercise_data.get("name", "Без названия")
+                )
+
+                for approach_data in approaches_data:
+                    models.FactualApproach.objects.create(
+                        exercise=factual_exercise,
+                        **approach_data
+                    )
+
+            return workout
+
+        except Exception as e:
+            print("❌ Error:", e)
+            raise serializers.ValidationError(
+                {"message": f"Error with input Workout: {str(e)}"}
             )
-            models.FactualApproach.objects.bulk_create(
-                [models.FactualApproach(exercise=factual_exercise, **ap) for ap in approaches_data]
-            )
 
-        return workout
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
 
 class WorkoutPurposeSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
     start_time = serializers.DateTimeField()   
     finish_time = serializers.DateTimeField()   
     purpose = serializers.IntegerField()   
+
+    def create(self,validated_data):
+        user_id = validated_data["user_id"]
+        start_time = validated_data["start_time"]
+        finish_time = validated_data["finish_time"]
+        purpose = validated_data["purpose"]
+
+        user = User.objects.get(id = user_id)
+        purpose = models.WorkoutPurpose.objects.create(
+            user=user, start_time=start_time, finish_time=finish_time, purpose=purpose
+        )
+        return purpose
+
+
+
     
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #

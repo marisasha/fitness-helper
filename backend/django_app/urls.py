@@ -36,12 +36,19 @@ urlpatterns = [
     path("api/create/workout",views.api_create_workout_plan),
     path("api/input/workout/data",views.api_input_workout_data),
     path("api/user/exercises/<int:user_id>/",views.api_user_exercises),
-    path("api/workout/recommended/",views.api_recommended_workouts),
 
     path("api/workouts/statistics/<int:user_id>/",views.api_workouts_statistics),
     path("api/workouts/statistics/exercise/<int:user_id>/",views.api_exercise_information),
-    path("api/create/workouts/purpose/<int:user_id>",views.api_create_purpose),
+
+    path("api/create/workouts/purpose",views.api_create_purpose),
     path("api/workouts/purpose/<int:user_id>/",views.api_user_purpose),
+    path("api/workout/recommended/",views.api_recommended_workouts),
+    path("api/exercises/instructions/",views.api_exercises_instructions),
+    path("api/exercise/instruction/<int:exercise_id>/",views.api_exercise_instruction),
+
+    path("api/users/top/by/stars/",views.api_user_top_by_stars),
+    path("api/user/reward/logs/<int:user_id>/",views.api_reward_logs),
+    path("api/reward/statuses/<int:user_id>/",views.api_reward_statuses),
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

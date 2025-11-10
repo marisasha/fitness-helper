@@ -87,7 +87,7 @@ class PlannedWorkoutListSerializer(serializers.Serializer):
         return None
 
     def get_exercises_count(self,obj):
-        return len(models.PlannedExercise.objects.filter(workout=obj))
+        return models.PlannedExercise.objects.filter(workout=obj).count()
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -226,3 +226,78 @@ class StatisticsWorkoutSerializer(serializers.Serializer):
     avg_time = serializers.FloatField()          
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+class ExerciseInstructionsFullSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.FitnesHelperExercise
+        fields = "__all__"  
+
+    def get_avatar(self, obj):
+        if obj.avatar:
+            return obj.avatar.url 
+        return None
+    
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+class ExerciseInstructionsNotFullSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.FitnesHelperExercise
+        fields = ("id","name","avatar")
+
+    def get_avatar(self, obj):
+        if obj.avatar:
+            return obj.avatar.url 
+        return None
+    
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+class UserRewardLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = models.UserRewardsLogs
+        fields = "__all__"
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+class UserRewardStatusesSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+    exercise_name = serializers.SerializerMethodField()
+    required_result = serializers.SerializerMethodField()
+    
+
+    class Meta:
+        model = models.UserRewardStatuses
+        fields = ("id", "avatar", "exercise_name","required_result")
+
+    def get_exercise_name(self, obj):
+        return obj.exercise_reward.exercise.name
+
+    def get_required_result(self, obj):
+        return obj.exercise_reward.required_result
+
+    def get_avatar(self, obj):
+        return obj.exercise_reward.avatar.url if obj.exercise_reward.avatar else None
+
+
+class ExerciseRewardStatusesSerializer(serializers.ModelSerializer):
+    exercise_name = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.ExerciseRewardStatuses
+        fields = ("id", "exercise_name", "avatar","required_result")
+
+    def get_exercise_name(self, obj):
+        return obj.exercise.name
+
+    def get_avatar(self, obj):
+        return obj.avatar.url if obj.avatar else None
+
+
+class UserAndAllRewardStatusesSerializer(serializers.Serializer):
+    user_rewards = UserRewardStatusesSerializer(many=True)
+    all_rewards = ExerciseRewardStatusesSerializer(many=True)

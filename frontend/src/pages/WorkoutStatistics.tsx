@@ -34,7 +34,26 @@ export default function WorkoutStatistics() {
   const plannedExercises = workoutData.planned_exercises ?? [];
   const factualExercises = workoutData.factual_exercises ?? [];
 
-  // 🔹 Подсчёт процента выполнения
+  // 🔹 Объединяем плановые и внеплановые упражнения
+  const allExercises = useMemo(() => {
+    const result = [...plannedExercises];
+    
+    // Добавляем внеплановые упражнения
+    factualExercises.forEach((fex: any) => {
+      const isPlanned = plannedExercises.some((pex: any) => pex.name === fex.name);
+      if (!isPlanned) {
+        result.push({
+          name: fex.name,
+          approaches: fex.approaches,
+          isCustom: true // помечаем как внеплановое
+        });
+      }
+    });
+    
+    return result;
+  }, [plannedExercises, factualExercises]);
+
+  // 🔹 Подсчёт процента выполнения (только для плановых упражнений)
   const completionPercent = useMemo(() => {
     if (!plannedExercises.length) return 0;
 
@@ -60,6 +79,29 @@ export default function WorkoutStatistics() {
 
     return total ? Math.round((completed / total) * 100) : 0;
   }, [plannedExercises, factualExercises]);
+
+  // 🔹 Функция для форматирования данных подхода
+  const renderApproachData = (approach: any) => {
+    const parts = [];
+    
+    if (approach.factual_time !== null && approach.factual_time !== undefined) {
+      parts.push(`Время: ${approach.factual_time / 60} мин`);
+    }
+    
+    if (approach.speed_exercise_equipment !== null && approach.speed_exercise_equipment !== undefined) {
+      parts.push(`Скорость: ${approach.speed_exercise_equipment} км/ч`);
+    }
+    
+    if (approach.weight_exercise_equipment !== null && approach.weight_exercise_equipment !== undefined) {
+      parts.push(`Вес: ${approach.weight_exercise_equipment} кг`);
+    }
+    
+    if (approach.count_approach !== null && approach.count_approach !== undefined) {
+      parts.push(`Повторения: ${approach.count_approach} раз`);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : 'Нет данных';
+  };
 
   // 🔹 JSX
   return (
@@ -97,21 +139,22 @@ export default function WorkoutStatistics() {
           </h1>
 
           <h1 className="text-lg sm:text-xl font-bold text-slate-100 mb-6">
-            Тренировка выполнена на{" "}
+            План выполнен на{" "}
             <span className="text-cyan-500">{completionPercent}%</span>
           </h1>
 
-          {plannedExercises.length === 0 && (
+          {allExercises.length === 0 && (
             <p className="text-slate-200 text-center">
               Нет данных для этой тренировки
             </p>
           )}
 
-          {plannedExercises.length > 0 && (
+          {allExercises.length > 0 && (
             <div className="flex flex-col gap-6">
-              {plannedExercises.map((pex: any, idx: number) => {
+              {allExercises.map((ex: any, idx: number) => {
+                const isCustomExercise = ex.isCustom;
                 const fex = factualExercises.find(
-                  (fe: any) => fe.name === pex.name
+                  (fe: any) => fe.name === ex.name
                 );
 
                 return (
@@ -119,13 +162,21 @@ export default function WorkoutStatistics() {
                     key={idx}
                     className="flex flex-col rounded-2xl bg-white shadow-md overflow-hidden p-4"
                   >
-                    <h2 className="font-bold text-lg sm:text-xl mb-3 text-slate-800">
-                      {pex.name}
-                    </h2>
+                    <div className="flex items-center gap-2 mb-3">
+                      <h2 className="font-bold text-lg sm:text-xl text-slate-800">
+                        {isCustomExercise ? "Внеплановое упражнение" : "Упражнение"}: {ex.name}
+                      </h2>
+                      {isCustomExercise && (
+                        <span className="px-2 py-1 bg-cyan-600 text-white text-xs rounded-full">
+                          доп.
+                        </span>
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {pex.approaches.map((pa: any, idy: number) => {
-                        const fa = fex?.approaches[idy] || {};
+                      {/* Плановые подходы */}
+                      {!isCustomExercise && ex.approaches.map((pa: any, idy: number) => {
+                        const fa = fex?.approaches?.[idy] || {};
 
                         const completed =
                           (fa.factual_time ?? 0) >= (pa.planned_time ?? 0) &&
@@ -139,51 +190,93 @@ export default function WorkoutStatistics() {
                         return (
                           <div
                             key={idy}
-                            className="flex justify-between items-center p-2 bg-slate-100 rounded-lg"
+                            className="flex justify-between items-center p-3 bg-slate-100 rounded-lg border-l-4 border-cyan-600"
                           >
-                            <div className="flex flex-col">
-                              <p className="font-bold">Подход {idy + 1}</p>
-                              <p>
-                                План:
-                                {pa.planned_time
-                                  ? ` Время: ${pa.planned_time / 60} мин,`
-                                  : ""}{" "}
-                                {pa.speed_exercise_equipment
-                                  ? ` Скорость: ${pa.speed_exercise_equipment} км/ч,`
-                                  : ""}{" "}
-                                {pa.weight_exercise_equipment
-                                  ? ` Вес: ${pa.weight_exercise_equipment} кг,`
-                                  : ""}{" "}
-                                {pa.count_approach
-                                  ? ` Повторения: ${pa.count_approach} раз`
-                                  : ""}
-                              </p>
-                              <p>
-                                Факт:
-                                {fa.factual_time
-                                  ? ` Время: ${fa.factual_time / 60} мин,`
-                                  : pa.factual_time ? " Время: 0 мин,":""}
-                                {fa.speed_exercise_equipment 
-                                  ? ` Скорость: ${fa.speed_exercise_equipment} км/ч,`
-                                  : pa.speed_exercise_equipment ? " Скорость: 0 км/ч,":""}
-                                {fa.weight_exercise_equipment
-                                  ? ` Вес: ${fa.weight_exercise_equipment} кг,`
-                                  : pa.weight_exercise_equipment ? " Вес: 0 кг,":""}
-                                {fa.count_approach
-                                  ? ` Повторения: ${fa.count_approach} раз`
-                                  : pa.count_approach ? " Повторения: 0 раз":""}
-                              </p>
+                            <div className="flex flex-col flex-1">
+                              <p className="font-bold text-slate-800">Подход {idy + 1}</p>
+                              <div className="mt-2">
+                                <p className="text-sm text-slate-600">
+                                  <span className="font-semibold">План:</span>{" "}
+                                  {renderApproachData(pa)}
+                                </p>
+                                <p className="text-sm text-slate-800 mt-1">
+                                  <span className="font-semibold">Факт:</span>{" "}
+                                  {renderApproachData(fa)}
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-2xl text-slate-800">
+                            <div className="text-2xl ml-3">
                               {completed ? (
-                                <i className="fa-solid fa-check text-cyan-600"></i>
+                                <i className="fa-solid fa-check text-green-600"></i>
                               ) : (
-                                <i className="fa-solid fa-xmark text-cyan-600"></i>
+                                <i className="fa-solid fa-xmark text-red-600"></i>
                               )}
                             </div>
                           </div>
                         );
                       })}
+
+                      {/* Внеплановые подходы для плановых упражнений */}
+                      {!isCustomExercise && fex && fex.approaches && fex.approaches.length > ex.approaches.length && 
+                        fex.approaches.slice(ex.approaches.length).map((fa: any, idy: number) => {
+                          const approachIndex = ex.approaches.length + idy;
+                          
+                          return (
+                            <div
+                              key={`custom-${idy}`}
+                              className="flex justify-between items-center p-3 bg-slate-100 rounded-lg border-l-4 border-orange-500"
+                            >
+                              <div className="flex flex-col flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-slate-800">
+                                    Внеплановый подход {approachIndex + 1}
+                                  </p>
+                                  <span className="px-2 py-1 bg-orange-500 text-white text-xs rounded-full">
+                                    доп.
+                                  </span>
+                                </div>
+                                <div className="mt-2">
+                                  <p className="text-sm text-slate-800">
+                                    <span className="font-semibold">Факт:</span>{" "}
+                                    {renderApproachData(fa)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-2xl ml-3 text-orange-500">
+                                <i className="fa-solid fa-plus"></i>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+
+                      {/* Подходы для внеплановых упражнений */}
+                      {isCustomExercise && ex.approaches.map((fa: any, idy: number) => (
+                        <div
+                          key={idy}
+                          className="flex justify-between items-center p-3 bg-slate-100 rounded-lg border-l-4 border-orange-500"
+                        >
+                          <div className="flex flex-col flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-slate-800">
+                                Внеплановый подход {idy + 1}
+                              </p>
+                              <span className="px-2 py-1 bg-orange-500 text-white text-xs rounded-full">
+                                доп.
+                              </span>
+                            </div>
+                            <div className="mt-2">
+                              <p className="text-sm text-slate-800">
+                                <span className="font-semibold">Факт:</span>{" "}
+                                {renderApproachData(fa)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-2xl ml-3 text-orange-500">
+                            <i className="fa-solid fa-plus"></i>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );

@@ -19,6 +19,10 @@ import Friends from "../pages/Friends"
 import FriendProfile from "../pages/FriendProfile"
 import FriendWorkoutsStatistics from "../pages/FriendWorkoutsStatistics"
 import ExerciseStatistics from "../pages/ExerciseStatistics"
+import ExercisesInstruction from "../pages/ExercisesInstruction"
+import ExerciseInstruction from "../pages/ExerciseInstruction"
+import StarsLogs from "../pages/StarsLogs"
+import UserRewardStatuses from "../pages/UserRewardStatuses"
 
 
 
@@ -35,7 +39,7 @@ export default function Router() {
         <Route path={"home/"} element={<MainPage />} />
 
         <Route path={"friends/"} element={<Friends />} />
-        <Route path={"friend/friend-profile/:friendId/"} element={<FriendProfile />} />
+        <Route path={"friend/friend-profile/:friendId"} element={<FriendProfile />} />
         <Route path={"friend/workouts-statistics/:friendId/"} element={<FriendWorkoutsStatistics />} />
 
         <Route path={"workouts/"} element={<Workouts/>}></Route>
@@ -44,11 +48,16 @@ export default function Router() {
         <Route path={"workouts/completed-workouts/:userId/"} element={<ComplatedWorkouts/>}></Route>
         <Route path={"workouts/workout-statistics/:workoutId/"} element={<WorkoutStatistics />} />
         <Route path={"workouts-statistics/"} element={<WorkoutsStatistics />} />
-        <Route path={"workouts-statistics/exercise/:exerciseName"} element={<ExerciseStatistics />} />
-        
+        <Route path={"workouts-statistics/exercise/:exerciseName/"} element={<ExerciseStatistics />} />
+
+        <Route path={"exercises/"} element={<ExercisesInstruction/>} />
+        <Route path={"exercise/:exerciseId/"} element={<ExerciseInstruction/>} />
+
 
         <Route path={"profile/"} element={<Profile />} />
-        <Route path={"profile/change-profile"} element={<ChangeProfile />} />
+        <Route path={"profile/change-profile/"} element={<ChangeProfile />} />
+        <Route path={"profile/stars-logs/"} element={<StarsLogs/>} />
+        <Route path={"profile/statuses/"} element={<UserRewardStatuses/>} />
         {/* safe redirect */}
       </Routes>
     </BrowserRouter>

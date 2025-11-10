@@ -176,10 +176,10 @@ SWAGGER_SETTINGS = {
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=int(os.getenv("ACCESS_TOKEN_LIFETIME", default=10))
+        minutes=int(os.getenv("ACCESS_TOKEN_LIFETIME"))
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
-        minutes=int(os.getenv("REFRESH_TOKEN_LIFETIME", default=60))
+        days=int(os.getenv("REFRESH_TOKEN_LIFETIME"))
     ),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -204,6 +204,7 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_LIFETIME": timedelta(minutes=10),
     "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(hours=1),
 }
+
 
 # if not DEBUG:
 #     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO","https")

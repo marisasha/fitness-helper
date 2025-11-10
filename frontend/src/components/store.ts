@@ -53,6 +53,16 @@ export const store = configureStore({
     FriendWorkoutsStatistics: components.constructorReducer(constants.FriendWorkoutsStatistics),
     // @ts-ignore
     exerciseStatistics: components.constructorReducer(constants.exerciseStatistics),
+    // @ts-ignore
+    exerciseInstruction: components.constructorReducer(constants.exerciseInstruction),
+    // @ts-ignore
+    exercisesInstruction: components.constructorReducer(constants.exercisesInstruction),
+    // @ts-ignore
+    userStarsLogs: components.constructorReducer(constants.userStarsLogs),
+    // @ts-ignore
+    topTenUsersByStars: components.constructorReducer(constants.topTenUsersByStars),
+    // @ts-ignore
+    rewardStatuses: components.constructorReducer(constants.rewardStatuses),
 
     
   },

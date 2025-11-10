@@ -74,19 +74,19 @@ export default function ExerciseStatisticsPage() {
               <div className="flex items-center justify-around text-center p-4 rounded-2xl text-slate-100 border-2 border-slate-100">
                 {stats.total_approaches !== undefined && (
                   <div>
-                    <p className="text-lg font-bold">{stats.total_approaches} подходы</p>
+                    <p className="text-lg font-bold">{stats.total_approaches}</p>
                     <p className="text-sm text-slate-400">Всего выполнений</p>
                   </div>
                 )}
                 {stats.max_count !== undefined && (
                   <div>
-                    <p className="text-lg font-bold">{stats.max_count} раз</p>
+                    <p className="text-lg font-bold">{stats.max_count}</p>
                     <p className="text-sm text-slate-400">Макс. повторений</p>
                   </div>
                 )}
                 {stats.max_weight !== undefined && (
                   <div>
-                    <p className="text-lg font-bold">{stats.max_weight} кг</p>
+                    <p className="text-lg font-bold">{stats.max_weight}</p>
                     <p className="text-sm text-slate-400">Макс. вес</p>
                   </div>
                 )}
@@ -107,7 +107,7 @@ export default function ExerciseStatisticsPage() {
                 {stats.max_time !== undefined && (
                   <div>
                     <p className="text-lg font-bold">
-                      {(stats.max_time / 60).toFixed(1)} мин
+                      {(stats.max_time / 60).toFixed(1)}
                     </p>
                     <p className="text-sm text-slate-400">Макс. время(мин)</p>
                   </div>
