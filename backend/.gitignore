@@ -1,2 +1,6 @@
 venv
 .env
+django_settings/__pycache__
+.gitignore
+media/exercise_avatar
+media/exercise_reward_avatar

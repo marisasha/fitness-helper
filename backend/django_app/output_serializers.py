@@ -36,7 +36,7 @@ class FriendSimpleSerializer(serializers.Serializer):
 class UserListSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "email", "is_active"]
+        fields = ["id", "username", "email", "is_completed"]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -59,7 +59,7 @@ class PlannedWorkoutListSerializer(serializers.Serializer):
     type = serializers.SerializerMethodField()
     start_time = serializers.SerializerMethodField()
     finish_time = serializers.SerializerMethodField()
-    is_active = serializers.SerializerMethodField()
+    is_completed = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     exercises_count = serializers.SerializerMethodField()
 
@@ -78,8 +78,8 @@ class PlannedWorkoutListSerializer(serializers.Serializer):
     def get_finish_time(self, obj):
         return obj.finish_time
     
-    def get_is_active(self, obj):
-        return obj.is_active
+    def get_is_completed(self, obj):
+        return obj.is_completed
     
     def get_avatar(self, obj):
         if hasattr(obj, 'avatar') and obj.avatar:
@@ -162,13 +162,14 @@ class PlannedWorkoutExersiceHardSerializator(serializers.Serializer):
 
 class PlannedWorkoutInfoHardSerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
     exercises = serializers.SerializerMethodField()
-    type = serializers.SerializerMethodField()
 
-    def get_type(self, obj):
-        return obj.type
     def get_name(self, obj):
         return obj.name
+    
+    def get_is_active(self, obj):
+        return obj.is_active
         
     def get_exercises(self, obj):
         exercises = models.PlannedExercise.objects.filter(workout=obj).order_by("id")
@@ -301,3 +302,33 @@ class ExerciseRewardStatusesSerializer(serializers.ModelSerializer):
 class UserAndAllRewardStatusesSerializer(serializers.Serializer):
     user_rewards = UserRewardStatusesSerializer(many=True)
     all_rewards = ExerciseRewardStatusesSerializer(many=True)
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+class FactualApproachSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.FactualApproach
+        fields = ["id","factual_time", "speed_exercise_equipment", "weight_exercise_equipment", "count_approach"]
+
+class FactualExerciseSerializer(serializers.ModelSerializer):
+    approaches = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.FactualExercise
+        fields = ["id","name", "approaches"]
+
+    def get_approaches(self, obj):
+        approaches = obj.factual_exercise.order_by("id")
+        return FactualApproachSerializer(approaches, many=True).data
+    
+
+class FactualWorkoutRetrieveSerializer(serializers.ModelSerializer):
+    exercises = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.Workout
+        fields = ["start_time", "exercises"]
+
+    def get_exercises(self, obj):
+        exercises = obj.factual_workout.order_by("id")
+        return FactualExerciseSerializer(exercises, many=True).data

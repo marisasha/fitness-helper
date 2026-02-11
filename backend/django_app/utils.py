@@ -55,11 +55,11 @@ def get_reward_for_completing_achievement(user_id: int):
     user = User.objects.get(id=user_id)
     if not user:
         raise Exception(f"Server error: User with id {user_id} not found")
-
+    
     now = timezone.localtime()
     today_workouts = models.Workout.objects.filter(
         user=user,
-        is_active=False,
+        is_completed=True,
         start_time__date=now.date()
     )
 
@@ -72,14 +72,14 @@ def get_reward_for_completing_achievement(user_id: int):
     
 
 
-    user_workouts = models.Workout.objects.filter(user=user, is_active=False)
+    user_workouts = models.Workout.objects.filter(user=user, is_completed=False)
     counter_start_for_add = 0
 
 # =-=-=Проведение тренировки=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
 
     try:
 
-
+        print("achievement_1 = Проведение тренировки\n\n\n")
         achievement_1 = "Проведение тренировки"
         models.UserRewardsLogs.objects.create(
             user=user,
@@ -117,6 +117,7 @@ def get_reward_for_completing_achievement(user_id: int):
             )
             counter_start_for_add += 1
     except Exception as e:
+
         raise Exception(f"Server error in issuance reward with achievement: {achievement_3}")
 
 # =-=-=Тренировка продолжительностью более 2-ух часов=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -131,7 +132,7 @@ def get_reward_for_completing_achievement(user_id: int):
             )
             counter_start_for_add += 1
     except Exception as e:
-        raise Exception(f"Server error in issuance reward with achievement: {achievement_4}")
+        raise Exception(f"Server error in issuance reward with achievement: {achievement_4}  error: {str(e)}")
 
 
 # =-=-=Выполнение достижения=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #

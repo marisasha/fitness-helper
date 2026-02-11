@@ -111,9 +111,9 @@ export default function Page() {
         {/* === Приветствие и цели === */}
         <div className="p-4 flex flex-col md:flex-row w-full md:w-11/12 justify-between items-start text-3xl md:text-5xl items-center md:items-start">
           {profile?.data && !profile.load && (
-            <div className="flex flex-col md:flex-row md:gap-x-5 items-center">
-              <h1 className="text-slate-100 font-bold">{getGreeting()}</h1>
-              <h1 className="text-slate-100 text-4xl md:text-6xl font-bold">
+            <div className="flex flex-col md:gap-x-5 items-center">
+              <h1 className="text-slate-100 font-bold animate-fade-in">{getGreeting()}</h1>
+              <h1 className="text-slate-100 text-4xl md:text-6xl font-bold animate-fade-in">
                 {profile.data}!
               </h1>
             </div>

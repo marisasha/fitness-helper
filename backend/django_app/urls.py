@@ -28,7 +28,7 @@ urlpatterns = [
     path("api/add/friend",views.api_accept_request_to_friends),
     path("api/delete/friend",views.api_delete_friend),
 
-    path("api/all/workouts/planned/user/<int:user_id>/<int:is_active>/",views.api_all_planned_user_workout),
+    path("api/all/workouts/planned/user/<int:user_id>/<int:is_completed>/",views.api_all_planned_user_workout),
     path("api/workout/info/<int:workout_id>",views.api_user_workout_info),
     path("api/workout/planned/info/<int:workout_id>/",views.api_user_planned_workout_info),
     path("api/workout/all/info/<int:workout_id>/",views.api_workout_info),
@@ -36,6 +36,11 @@ urlpatterns = [
     path("api/create/workout",views.api_create_workout_plan),
     path("api/input/workout/data",views.api_input_workout_data),
     path("api/user/exercises/<int:user_id>/",views.api_user_exercises),
+    path("api/workout/active/info/<int:workout_id>/",views.api_workout_active_info),
+
+# /////
+    path("api/change",views.api_change),
+# //////
 
     path("api/workouts/statistics/<int:user_id>/",views.api_workouts_statistics),
     path("api/workouts/statistics/exercise/<int:user_id>/",views.api_exercise_information),

@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { Autocomplete, TextField } from "@mui/material";
+import { useUser } from "../components/profile";
 import * as bases from "../components/bases";
 import * as components from "../components/components";
 import * as constants from "../components/constants";
@@ -9,14 +11,21 @@ export default function WorkoutPage() {
   const { workoutId, userId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const user: any = useUser();
 
-  const plan = useSelector((state: any) => state.workoutPlan.data);
+  const plan = useSelector((state: any) => state.workoutPlan.data) ?? {};
+  const exercise = useSelector((state: any) => state.userExercises);
+  const [activeWorkoutData, setActiveWorkoutData] = useState<any>(null);
+  const [activeWorkoutLoading, setActiveWorkoutLoading] = useState(false);
+
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [currentApproachIndex, setCurrentApproachIndex] = useState(0);
   const [doneData, setDoneData] = useState<any[]>([]);
   const [isStarted, setIsStarted] = useState(false);
-  const [seconds, setSeconds] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
-  const [currentApproachIndex, setCurrentApproachIndex] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+  const [isFinishing, setIsFinishing] = useState(false);
+
   const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [newExerciseFields, setNewExerciseFields] = useState({
@@ -26,48 +35,185 @@ export default function WorkoutPage() {
     count: false,
   });
 
-  // Загружаем план
-  useEffect(() => {
+  const getPlan = async () => {
     if (workoutId && userId) {
-      components.constructorWebAction(
-        dispatch,
-        constants.workoutPlan,
-        `${constants.host}/api/workout/planned/info/${workoutId}`,
-        "GET"
-      );
+      const url = `${constants.host}/api/workout/planned/info/${workoutId}`;
+      await components.constructorWebAction(dispatch, constants.workoutPlan, url, "GET");
     }
-  }, [workoutId, userId, dispatch]);
+  };
 
-  // Подготавливаем doneData
   useEffect(() => {
-    if (plan?.exercises) {
-      setDoneData(
-        plan.exercises.map((ex: any) => ({
-          name: ex.name,
-          approaches: ex.approaches.map((ap: any) => ({
-            factual_time: ap.planned_time !== null ? null : null,
-            speed_exercise_equipment:
-              ap.speed_exercise_equipment !== null ? null : null,
-            weight_exercise_equipment:
-              ap.weight_exercise_equipment !== null ? null : null,
-            count_approach: ap.count_approach !== null ? null : null,
-          })),
-        }))
-      );
-    }
-  }, [plan]);
+      if (user?.user_id) {
+        components.constructorWebAction(
+          dispatch,
+          constants.userExercises,
+          `${constants.host}/api/user/exercises/${user.user_id}`,
+          "GET"
+        );
+        
+      }
+    }, [user]);
 
-  // Таймер
+  async function loadActiveWorkoutDirect() {
+    if (!workoutId) return;
+
+    try {
+      setActiveWorkoutLoading(true);
+      const res = await fetch(`${constants.host}/api/workout/active/info/${workoutId}/`);
+      const result = await res.json();
+      const data = result.data ?? result;
+
+      if (!data?.start_time) {
+        setActiveWorkoutData(null);
+        setIsStarted(false);
+        setStartTime(null);
+        setSeconds(0);
+        setDoneData([]);
+        return;
+      }
+
+      setActiveWorkoutData(data);
+      setDoneData(data.exercises ?? []);
+
+      const restoredStart = new Date(data.start_time);
+      setStartTime(restoredStart);
+      setIsStarted(true);
+      setSeconds(Math.floor((Date.now() - restoredStart.getTime()) / 1000));
+    } catch (err) {
+      console.error("Ошибка загрузки активной тренировки", err);
+    } finally {
+      setActiveWorkoutLoading(false);
+    }
+  }
+
+  async function startWorkout() {
+    if (!workoutId) return;
+    const start = new Date();
+
+    await components.constructorWebAction(
+      dispatch,
+      constants.workoutStart,
+      `${constants.host}/api/input/workout/data`,
+      "POST",
+      {},
+      {
+        workout_id: Number(workoutId),
+        start_time: start.toISOString(),
+        is_active: true,
+        exercises: doneData || [],
+      }
+    );
+
+    await loadActiveWorkoutDirect();
+  }
+
+  async function saveAuto() {
+    if (!startTime) return;
+
+    await components.constructorWebAction(
+      dispatch,
+      constants.workoutSave,
+      `${constants.host}/api/input/workout/data`,
+      "POST",
+      {},
+      {
+        workout_id: Number(workoutId),
+        start_time: startTime.toISOString(),
+        is_active: true,
+        exercises: doneData,
+      }
+    );
+  }
+
+  async function finishWorkout() {
+    if (!startTime || isFinishing) return; 
+    setIsFinishing(true);
+
+    for (const ex of doneData) {
+      for (const ap of ex.approaches) {
+        const isFilled = 
+          (ap.factual_time !== null && ap.factual_time !== undefined) ||
+          (ap.speed_exercise_equipment !== null && ap.speed_exercise_equipment !== undefined) ||
+          (ap.weight_exercise_equipment !== null && ap.weight_exercise_equipment !== undefined) ||
+          (ap.count_approach !== null && ap.count_approach !== undefined);
+
+        if (!isFilled) {
+          alert(`Не все подходы заполнены в упражнении "${ex.name}". Пожалуйста, заполните все данные.`);
+          setIsFinishing(false);
+          return;
+        }
+      }
+    }
+
+    await components.constructorWebAction(
+      dispatch,
+      constants.workoutFinish,
+      `${constants.host}/api/input/workout/data`,
+      "POST",
+      {},
+      {
+        workout_id: Number(workoutId),
+        start_time: startTime.toISOString(),
+        finish_time: new Date().toISOString(),
+        is_active: false,
+        exercises: doneData,
+      }
+    );
+
+    setIsStarted(false);
+    alert("Тренировка завершена");
+    navigate("/workouts");
+  }
+  
+
+  useEffect(() => {
+    getPlan();
+    loadActiveWorkoutDirect();
+  }, [workoutId, userId]);
+
+  useEffect(() => {
+    const exercises = plan?.exercises ?? [];
+    if (!exercises.length || isStarted || doneData.length > 0) return;
+
+    setDoneData(
+      exercises.map((ex: any) => ({
+        name: ex.name,
+        approaches: ex.approaches.map((ap: any) => ({
+          factual_time: ap.planned_time !== null ? null : undefined,
+          speed_exercise_equipment: ap.speed_exercise_equipment !== null ? null : undefined,
+          weight_exercise_equipment: ap.weight_exercise_equipment !== null ? null : undefined,
+          count_approach: ap.count_approach !== null ? null : undefined,
+        })),
+      }))
+    );
+  }, [plan, isStarted]);
+
+  useEffect(() => {
+    setDoneData([]);
+    setActiveWorkoutData(null);
+    setIsStarted(false);
+    setStartTime(null);
+    setSeconds(0);
+    setCurrentExerciseIndex(0);
+    setCurrentApproachIndex(0);
+  }, [workoutId]);
+
   useEffect(() => {
     if (!isStarted || !startTime) return;
 
     const interval = setInterval(() => {
-      const now = new Date();
-      setSeconds(Math.floor((now.getTime() - startTime.getTime()) / 1000));
+      setSeconds(Math.floor((new Date().getTime() - startTime.getTime()) / 1000));
     }, 500);
 
     return () => clearInterval(interval);
   }, [isStarted, startTime]);
+
+  useEffect(() => {
+    if (!isStarted || !startTime) return;
+
+    const interval = setInterval(() => saveAuto(), 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isStarted, startTime, doneData]);
 
   function formatTime(sec: number) {
     const m = Math.floor(sec / 60);
@@ -75,172 +221,100 @@ export default function WorkoutPage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }
 
-  function updateDoneApproach(
-    exIndex: number,
-    apIndex: number,
-    field: string,
-    value: number | null
-  ) {
+  // ========== Работа с упражнениями ==========
+  function updateDoneApproach(exIndex: number, apIndex: number, field: string, value: number | null) {
     const updated = [...doneData];
     updated[exIndex].approaches[apIndex][field] = value;
     setDoneData(updated);
   }
 
-  // Добавить внеплановый подход
   function addApproach() {
     const updated = [...doneData];
-    const currentExercise = updated[currentExerciseIndex];
-    
-    // Наследуем структуру полей из первого подхода
-    const firstApproach = currentExercise.approaches[0];
+    const firstApproach = updated[currentExerciseIndex].approaches[0];
     const newApproach = { ...firstApproach };
-    
-    // Обнуляем значения, но сохраняем структуру
-    Object.keys(newApproach).forEach(key => {
-      if (newApproach[key] !== undefined && newApproach[key] !== null) {
-        newApproach[key] = null;
-      }
-    });
-
+    Object.keys(newApproach).forEach(key => newApproach[key] = null);
     updated[currentExerciseIndex].approaches.push(newApproach);
     setDoneData(updated);
     setCurrentApproachIndex(updated[currentExerciseIndex].approaches.length - 1);
   }
 
-  // Добавить внеплановое упражнение
   function addExercise() {
     setNewExerciseName("");
-    setNewExerciseFields({
-      time: false,
-      speed: false,
-      weight: false,
-      count: false,
-    });
+    setNewExerciseFields({ time: false, speed: false, weight: false, count: false });
     setShowAddExerciseModal(true);
   }
 
   function confirmAddExercise() {
-    if (!newExerciseName.trim()) {
-      alert("Введите название упражнения");
-      return;
+    if (!newExerciseName.trim()) { alert("Введите название упражнения"); return; }
+    if (!newExerciseFields.time && !newExerciseFields.speed && !newExerciseFields.weight && !newExerciseFields.count) {
+      alert("Выберите хотя бы один параметр для отслеживания"); return;
     }
 
-    if (!newExerciseFields.time && !newExerciseFields.speed && 
-        !newExerciseFields.weight && !newExerciseFields.count) {
-      alert("Выберите хотя бы один параметр для отслеживания");
-      return;
-    }
-
-    const updated = [...doneData];
     const newExercise = {
       name: newExerciseName.trim(),
-      approaches: [
-        {
-          factual_time: newExerciseFields.time ? null : undefined,
-          speed_exercise_equipment: newExerciseFields.speed ? null : undefined,
-          weight_exercise_equipment: newExerciseFields.weight ? null : undefined,
-          count_approach: newExerciseFields.count ? null : undefined,
-        },
-      ],
+      approaches: [{
+        factual_time: null,
+        speed_exercise_equipment: null,
+        weight_exercise_equipment: null,
+        count_approach: null,
+      }]
     };
-    updated.push(newExercise);
+    const updated = [...doneData, newExercise];
     setDoneData(updated);
     setCurrentExerciseIndex(updated.length - 1);
     setCurrentApproachIndex(0);
     setShowAddExerciseModal(false);
   }
 
-  // Завершение тренировки
-  async function finishWorkout() {
-    try {
-      if (!startTime) {
-        alert("Ошибка: время начала не установлено");
-        return;
-      }
-
-      const finishTime = new Date();
-
-      const payload = {
-        workout_id: Number(workoutId),
-        start_time: startTime.toISOString(),
-        finish_time: finishTime.toISOString(),
-        exercises: doneData.map((ex) => ({
-          name: ex.name,
-          //@ts-ignore
-          approaches: ex.approaches.map((ap) => ({
-            factual_time: ap.factual_time ?? null,
-            speed_exercise_equipment: ap.speed_exercise_equipment ?? null,
-            weight_exercise_equipment: ap.weight_exercise_equipment ?? null,
-            count_approach: ap.count_approach ?? null,
-          })),
-        })),
-      };
-      await components.constructorWebAction(
-        dispatch,
-        constants.workoutFinish,
-        `${constants.host}/api/input/workout/data`,
-        "POST",
-        {},
-        payload
-      );
-
-      alert("✅ Тренировка завершена и сохранена!");
-      navigate("/workouts");
-    } catch (error) {
-      console.error("Ошибка при сохранении данных:", error);
-      alert("Ошибка при сохранении данных о тренировке");
-    }
+  // ========== Сопоставление упражнений по имени ==========
+  function normalizeExerciseName(name: string) {
+    return name.trim().toLowerCase().replace(/\s+/g, " ");
   }
 
-  if (!plan) {
-    return (
-      <bases.Base>
-        <div className="p-5 text-center text-lg">Загрузка плана тренировки...</div>
-      </bases.Base>
-    );
-  }
+  const planExerciseMap = useMemo(() => {
+    const map = new Map<string, any>();
+    (plan?.exercises ?? []).forEach((ex: any) => {
+      map.set(normalizeExerciseName(ex.name), ex);
+    });
+    return map;
+  }, [plan]);
 
-  const currentExercise =
-    doneData[currentExerciseIndex] ?? { approaches: [], name: "" };
-  const currentApproachDone =
-    currentExercise.approaches?.[currentApproachIndex] ?? {};
+  const currentExercise = doneData[currentExerciseIndex] ?? { approaches: [], name: "" };
+  const currentExercisePlan = planExerciseMap.get(normalizeExerciseName(currentExercise.name)) ?? { approaches: [] };
+  const currentApproachDone = currentExercise.approaches?.[currentApproachIndex] ?? {};
+  const currentApproachPlan = currentExercisePlan.approaches?.[currentApproachIndex] ?? {};
+  const isCustomExercise = currentExerciseIndex >= ((plan?.exercises?.length) ?? 0);
+  const isCustomApproach = currentApproachIndex >= (currentExercisePlan.approaches?.length ?? 0);
+  const showGoalBlock = !isCustomExercise && !isCustomApproach && currentExercisePlan.approaches.length > 0;
+  const exerciseOptions = exercise.data ? exercise.data.map((ex: any) => ex.name) : []
 
-  const currentApproachPlan =
-    plan.exercises?.[currentExerciseIndex]?.approaches?.[
-      currentApproachIndex
-    ] ?? {};
-
-  // Определяем, является ли упражнение кастомным
-  const isCustomExercise = currentExerciseIndex >= (plan.exercises?.length || 0);
-  
-  // Определяем, является ли подход добавленным вручную
-  const isCustomApproach = currentApproachIndex >= (plan.exercises?.[currentExerciseIndex]?.approaches?.length || 0);
-  
-  // Определяем, нужно ли показывать блок "Цель"
-  const showGoalBlock = !isCustomExercise && !isCustomApproach && plan.exercises[currentExerciseIndex];
-
-  // Определяем, какие поля показывать
-  // Для всех подходов используем структуру первого подхода текущего упражнения
   const firstApproach = currentExercise.approaches?.[0] ?? {};
   const showTime = firstApproach.factual_time !== undefined;
   const showSpeed = firstApproach.speed_exercise_equipment !== undefined;
   const showWeight = firstApproach.weight_exercise_equipment !== undefined;
   const showCount = firstApproach.count_approach !== undefined;
 
+
   return (
     <bases.Base>
-      {/* Модальное окно для добавления упражнения */}
       {showAddExerciseModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-xl font-bold mb-4 text-black">Добавить упражнение</h3>
-            
-            <input
-              type="text"
-              placeholder="Название упражнения"
+            <Autocomplete
+              freeSolo
+              options={exerciseOptions}
               value={newExerciseName}
-              onChange={(e) => setNewExerciseName(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg mb-4 text-black"
+              onChange={(event, newValue) => setNewExerciseName(newValue || "")}
+              onInputChange={(event, newInputValue) => setNewExerciseName(newInputValue)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Название упражнения"
+                  variant="outlined"
+                  className="w-full"
+                />
+              )}
             />
             
             <div className="space-y-3 mb-6">
@@ -305,7 +379,6 @@ export default function WorkoutPage() {
 
       <div className="w-full mt-16 md:mt-20">
         <div className="m-auto flex flex-col gap-y-4 md:gap-y-5 w-full max-w-2xl md:max-w-3xl px-2">
-          {/* Заголовок */}
           <div className="flex items-center justify-around flex-wrap text-center gap-3">
             <div className="flex items-end justify-center text-sm md:text-lg font-semibold leading-6 text-cyan-600 hover:text-gray-600">
               <span className="text-3xl md:text-5xl">Fitnes</span>
@@ -372,7 +445,7 @@ export default function WorkoutPage() {
             {/* Фактические данные */}
             <div className="flex flex-col items-center w-full">
               <div className="flex flex-col gap-3 md:gap-4 w-full">
-                {showTime && currentApproachPlan.planned_time !== null && currentApproachPlan.planned_time !== undefined && (
+                {currentApproachPlan.planned_time !== null && currentApproachPlan.planned_time !== undefined && (
                   <NumericInput
                     placeholder="Время (мин)"
                     value={
@@ -460,20 +533,17 @@ export default function WorkoutPage() {
               </div>
 
               {/* Кнопки управления тренировкой */}
-              <div className="w-full flex flex-wrap justify-between items-center mt-10 md:mt-20 gap-4">
+              <div className="w-full flex flex-col justify-between  mt-10 md:mt-20 gap-4">
                 {!isStarted ? (
                   <button
-                    onClick={() => {
-                      setIsStarted(true);
-                      setStartTime(new Date());
-                    }}
+                    onClick={startWorkout}
                     className="text-base md:text-lg bg-cyan-600 text-slate-100 px-4 py-2 md:px-5 md:py-3 rounded-2xl hover:bg-slate-100 hover:text-cyan-600 border-2 border-slate-100 hover:border-cyan-600"
                   >
                     ▶️ Начать
                   </button>
                 ) : (
                   <>
-                    <div className="flex gap-3">
+                    <div className="flex gap-x-2 justify-center">
                       {(showCount || showWeight || showSpeed || showTime) && (
                         <button
                           onClick={addApproach}
@@ -489,13 +559,32 @@ export default function WorkoutPage() {
                         ➕ Упражнение
                       </button>
                     </div>
-                    <button
-                      onClick={finishWorkout}
-                      className="text-base md:text-lg bg-red-600 text-slate-100 px-4 py-2 md:px-5 md:py-3 rounded-2xl hover:bg-slate-100 hover:text-red-600 border-2 border-slate-100 hover:border-red-600"
-                    >
-                      ⏹ Завершить
-                    </button>
-                    <div className="text-base md:text-xl text-gray-900">
+                    
+                    <div className="flex gap-x-2 items-center justify-center">
+                      <button
+                        disabled={activeWorkoutLoading}
+                        onClick={loadActiveWorkoutDirect}
+                        className="bg-yellow-400 px-3 py-2 text-white rounded-xl disabled:opacity-50 w-2/3 hover:bg-yellow-300"
+                      >
+                        {activeWorkoutLoading ? "Загрузка..." : "Обновить данные" }
+                      </button>
+                      {!isFinishing ? (
+                      <button
+                        onClick={finishWorkout}
+                        className="text-base md:text-lg bg-red-600 text-slate-100 px-3 py-2 md:px-5 md:py-3 rounded-2xl hover:bg-slate-100 hover:text-red-600 border-2 border-slate-100 hover:border-red-600"
+                      >
+                        Завершить
+                      </button>
+                    ): (
+                      <button
+                        disabled
+                        className="text-base md:text-lg bg-red-600 text-slate-100 px-4 py-2 md:px-5 md:py-3 rounded-2xl hover:bg-slate-100 hover:text-red-600 border-2 border-slate-100 hover:border-red-600"
+                      >
+                        Завершить
+                      </button>
+                    )}
+                    </div>
+                    <div className="text-base md:text-xl text-gray-900 ">
                       ⏱ {formatTime(seconds)}
                     </div>
                   </>

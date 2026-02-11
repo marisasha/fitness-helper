@@ -15,7 +15,6 @@ export default function Page() {
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Получение завершённых тренировок с сервера
   const getWorkout = async (page: number = 1) => {
     if (!user) return;
     const url = `${constants.host}/api/all/workouts/planned/user/${user.user_id}/1?page=${page}&page_size=${PAGE_SIZE}`;
@@ -33,8 +32,38 @@ export default function Page() {
   if (!user) return <bases.Base />;
 
   const workoutResults = workout?.data?.results ?? [];
+  const activeWorkouts = workout?.data?.active_workouts ?? [];
   const totalPages = workout?.data?.total_pages ?? 1;
-  const hasWorkouts = workoutResults.length > 0;
+
+  const renderWorkoutCard = (item: any, isActive: boolean = false) => (
+    <div key={item.id} className="flex flex-col rounded-2xl bg-white shadow-md overflow-hidden">
+      <img
+        src={`${constants.host}${item.avatar}`}
+        alt={`fitness-${item.id}`}
+        className="w-full h-44 object-cover"
+      />
+      <div className="flex flex-col items-center text-center gap-y-4 p-4 text-slate-800">
+        <h1 className="font-bold text-lg sm:text-xl leading-7 tracking-tight">{item.name}</h1>
+        <div className="text-sm sm:text-base">
+          <p>Количество упражнений: {item.exercises_count}</p>
+          <p className="mt-1">
+            Тип тренировки:{" "}
+            <span className="text-xs sm:text-sm bg-yellow-400 border rounded-lg px-2 py-0.5">
+              {item.type ?? "Не указан"}
+            </span>
+          </p>
+        </div>
+        <Link to={`/workouts/training/${item.id}/user/${user.user_id}`} className="w-full">
+          <div className="mt-3 flex justify-center bg-cyan-600 hover:bg-slate-100 rounded-3xl transition text-slate-100 hover:text-cyan-600">
+            <h1 className="p-2 text-sm sm:text-lg font-bold leading-7 tracking-tight">
+              {isActive ? "Продолжить тренировку" : "Начать тренировку"}
+            </h1>
+          </div>
+        </Link>
+      </div>
+    </div>
+  );
+
 
   return (
     <bases.Base>
@@ -51,83 +80,55 @@ export default function Page() {
             </Link>
           </div>
 
+          {/* Активные тренировки */}
+          {activeWorkouts.length > 0 && (
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold leading-9 tracking-tight text-slate-100 mb-6 flex items-center gap-3">
+                Активные тренировки:
+              </h1>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
+                {/* @ts-ignore */}
+                {activeWorkouts.map(item => renderWorkoutCard(item, true))}
+              </div>
+            </div>
+          )}
+
+          {/* Запланированные тренировки */}
           <h1 className="text-2xl sm:text-3xl font-bold leading-9 tracking-tight text-slate-100 mb-6 flex items-center gap-3">
-            Ваши запланированные тренировки:
+            Запланированные тренировки:
             {workout.load && (
               <div className="w-6 h-6 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
             )}
           </h1>
 
-          {/* Пустое состояние */}
-          {!hasWorkouts && !workout.load && (
-            <p className="w-full text-base sm:text-lg text-slate-200 text-center sm:text-left">
-              У вас нет ещё запланированных тренировок
+          {workoutResults.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-20">
+              {/* @ts-ignore */}
+              {workoutResults.map(item => renderWorkoutCard(item))}
+            </div>
+          ) : (
+            <p className="w-full text-base sm:text-lg text-slate-200 text-center sm:text-left mb-20">
+              У вас нет запланированных тренировок
             </p>
           )}
 
-          {/* Список тренировок */}
-          {hasWorkouts && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {workoutResults.map((item: any) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col rounded-2xl bg-white shadow-md overflow-hidden"
-                  >
-                    <img
-                      src={`${constants.host}${item.avatar}`}
-                      alt={`fitness-${item.id}`}
-                      className="w-full h-44 object-cover"
-                    />
-
-                    <div className="flex flex-col items-center text-center gap-y-4 p-4 text-slate-800">
-                      <h1 className="font-bold text-lg sm:text-xl leading-7 tracking-tight">
-                        {item.name}
-                      </h1>
-                      <div className="text-sm sm:text-base">
-                        <p>Количество упражнений: {item.exercises_count}</p>
-                        <p className="mt-1">
-                          Тип тренировки:{" "}
-                          <span className="text-xs sm:text-sm bg-yellow-400 border rounded-lg px-2 py-0.5">
-                            {item.type ?? "Не указан"}
-                          </span>
-                        </p>
-                      </div>
-
-                      <Link
-                        to={`/workouts/training/${item.id}/user/${user.user_id}`}
-                        className="w-full"
-                      >
-                        <div className="mt-3 flex justify-center bg-cyan-600 hover:bg-slate-100 rounded-3xl transition text-slate-100 hover:text-cyan-600">
-                          <h1 className="p-2 text-sm sm:text-lg font-bold leading-7 tracking-tight">
-                            Начать тренировку
-                          </h1>
-                        </div>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Навигатор страниц */}
-              {totalPages > 1 && (
-                <div className="flex justify-center mt-8 mb-8 gap-2">
-                  {Array.from({ length: totalPages }, (_, idx) => (
-                    <button
-                      key={idx + 1}
-                      onClick={() => setCurrentPage(idx + 1)}
-                      className={`px-3 py-1 rounded-md ${
-                        currentPage === idx + 1
-                          ? "bg-cyan-600 text-white"
-                          : "bg-slate-200 text-slate-800"
-                      }`}
-                    >
-                      {idx + 1}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
+          {/* Навигатор страниц */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8 mb-8 gap-2">
+              {Array.from({ length: totalPages }, (_, idx) => (
+                <button
+                  key={idx + 1}
+                  onClick={() => setCurrentPage(idx + 1)}
+                  className={`px-3 py-1 rounded-md ${
+                    currentPage === idx + 1
+                      ? "bg-cyan-600 text-white"
+                      : "bg-slate-200 text-slate-800"
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

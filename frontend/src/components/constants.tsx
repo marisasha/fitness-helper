@@ -2,8 +2,8 @@
 import { constructorConstant } from "../components/components";
 
 
-export const host = "https://fitness-helper.ru";
-// export const host = "http://127.0.0.1:8000";
+// export const host = "https://fitness-helper.ru";
+export const host = "http://127.0.0.1:8000";
 
 // app
 export const workoutList = constructorConstant("workoutList");
@@ -12,7 +12,6 @@ export const workoutId = constructorConstant("workoutId");
 export const workoutRepeatId = constructorConstant("workoutRepeatId");
 export const workoutStatistics = constructorConstant("workoutStatistics");
 export const workoutsStatistics = constructorConstant("workoutStatistics");
-export const workoutFinish = constructorConstant("workoutFinish");
 export const workoutFinishList = constructorConstant("workoutList");
 export const workoutPurpose = constructorConstant("workoutPurpose");
 export const workoutListRecommended = constructorConstant("workoutListRecommended");
@@ -22,6 +21,13 @@ export const exerciseInstruction = constructorConstant("exerciseInstruction");
 export const topTenUsersByStars = constructorConstant("topTenUsersByStars");
 export const rewardStatuses = constructorConstant("rewardStatuses");
 
+
+// workout go
+   
+export const workoutStart = constructorConstant("workoutStart");    
+export const workoutFinish = constructorConstant("workoutFinish");   
+export const workoutSave = constructorConstant("workoutSave");   
+export const workoutActive = constructorConstant("workoutActive");   
 
 
 // user

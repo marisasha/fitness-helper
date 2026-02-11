@@ -28,7 +28,6 @@ class Profile(models.Model):
         blank=True,
         null=True,
         default=None,
-        max_length=150
     )
     surname = models.CharField(
         verbose_name="Фамилия",
@@ -38,7 +37,6 @@ class Profile(models.Model):
         blank=True,
         null=True,
         default=None,
-        max_length=150
     )
 
     birth_date = models.DateTimeField(
@@ -179,7 +177,6 @@ class Workout(models.Model):
         blank=True,
         null=True,
         default=None,
-        max_length=150
     )
     type = models.CharField(
         verbose_name="Тип тренировки",
@@ -189,9 +186,6 @@ class Workout(models.Model):
         blank=True,
         null=True,
         default=None,
-    )
-    is_active = models.BooleanField(
-        verbose_name="Активна ли тренировка", null=False, default=True
     )
     avatar = models.ImageField(
         verbose_name="Аватар тренировки",
@@ -203,9 +197,16 @@ class Workout(models.Model):
         upload_to="workout_avatar/",
     )
 
+    is_completed = models.BooleanField(
+        verbose_name="Завершена ли тренировка", null=False, default=False
+    )
     is_recommended = models.BooleanField(
         verbose_name="Рекомендуемая ли тренировка", null=False, default=False
     )
+    is_active = models.BooleanField(
+        verbose_name="Активна ли тренировка", null=False, default=False
+    )
+    
 
     class Meta:
         app_label = "django_app"
@@ -238,7 +239,6 @@ class PlannedExercise(models.Model):
         blank=True,
         null=True,
         default=None,
-        max_length=150
     )
 
     class Meta:
@@ -330,7 +330,6 @@ class FactualExercise(models.Model):
         blank=True,
         null=True,
         default=None,
-        max_length=150
     )
 
     class Meta:
@@ -479,7 +478,6 @@ class Exercises(models.Model):
         editable=True,
         blank=True,
         null=False,
-        max_length=150
     )
 
     class Meta:
@@ -501,7 +499,6 @@ class FitnesHelperExercise(models.Model):
         editable=True,
         blank=True,
         null=False,
-        max_length=150
     )
 
     description = models.TextField(
@@ -531,7 +528,6 @@ class FitnesHelperExercise(models.Model):
         editable=True,
         blank=True,
         null=False,
-        max_length=150
     )
 
     recommendations_for_women = models.CharField(
@@ -541,7 +537,6 @@ class FitnesHelperExercise(models.Model):
         editable=True,
         blank=True,
         null=False,
-        max_length=150
     )
 
     avatar = models.ImageField(
@@ -585,7 +580,6 @@ class ExerciseRewardStatuses(models.Model):
         editable=True,
         blank=True,
         null=False,
-        max_length=150
     )
 
     required_result = models.IntegerField(

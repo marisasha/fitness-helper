@@ -46,7 +46,7 @@ export default function CreateWorkoutPage() {
       );
       
     }
-  }, [dispatch,user]);
+  }, [user]);
 
   useEffect(() => {
     if (user?.user_id) {
@@ -192,7 +192,7 @@ export default function CreateWorkoutPage() {
 
           {/* Блок упражнения */}
           {currentExerciseIndex !== null && (
-            <div className="border p-4 rounded-2xl bg-white shadow space-y-4">
+            <div className="border px-2 py-3 rounded-2xl bg-white shadow space-y-4">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <h2 className="text-lg font-semibold">
                   Упражнение {currentExerciseIndex + 1}
@@ -238,50 +238,48 @@ export default function CreateWorkoutPage() {
               {/* Подходы */}
               <div className="mt-2 space-y-3">
                 {plan.exercises[currentExerciseIndex].approaches.map((ap, idx) => (
-                  <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {/* Время */}
+                  <div key={idx} className="space-y-1">
+                    {/* Номер подхода */}
+                    {idx == 0 ? "": <div className="w-full h-px bg-black mt-4 mb-4"></div>}
+                    <div className="font-semibold text-sm md:text-base text-slate-700">
+                      Подход {idx + 1}
+                    </div>
+                    {/* Поля ввода */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {/* Время */}
                       <NumericInput
-                        value={
-                          ap.planned_time === null ? null : ap.planned_time / 60
-                        }
+                        value={ap.planned_time === null ? null : ap.planned_time / 60}
                         placeholder="Время"
                         onChange={(val) => updateApproach(idx, "planned_time", val)}
                         min={0}
                       />
-                    {/* Скорость */}
-      
+                      {/* Скорость */}
                       <NumericInput
                         value={ap.speed_exercise_equipment}
                         placeholder="Скорость"
-                        onChange={(val) =>
-                          updateApproach(idx, "speed_exercise_equipment", val)
-                        }
+                        onChange={(val) => updateApproach(idx, "speed_exercise_equipment", val)}
                         min={0}
                       />
-
-
-                    {/* Вес */}
-
+                      {/* Вес */}
                       <NumericInput
                         value={ap.weight_exercise_equipment}
                         placeholder="Вес"
-                        onChange={(val) =>
-                          updateApproach(idx, "weight_exercise_equipment", val)
-                        }
+                        onChange={(val) => updateApproach(idx, "weight_exercise_equipment", val)}
                         min={0}
                       />
-                    {/* Повторения */}
+                      {/* Повторения */}
                       <NumericInput
                         value={ap.count_approach}
                         placeholder="Повторения"
-                        onChange={(val) =>
-                          updateApproach(idx, "count_approach", val)
-                        }
+                        onChange={(val) => updateApproach(idx, "count_approach", val)}
                         min={0}
                       />
                     </div>
+                      
+                  </div>
                 ))}
               </div>
+
 
               {/* Навигация */}
               <div className="flex justify-between mt-3">

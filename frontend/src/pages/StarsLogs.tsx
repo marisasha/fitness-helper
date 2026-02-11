@@ -34,9 +34,8 @@ export default function StarsLogs() {
         </p>
 
         {hasStarsLogs ? (
-          <div className="w-full max-w-5xl">
-            <div className="hidden sm:grid grid-cols-12 py-3 px-4 border-b border-slate-700 text-slate-400 text-sm font-semibold">
-              <div className="col-span-1 text-left">#</div>
+          <div className="w-full max-w-5xl ">
+            <div className="hidden sm:grid grid-cols-12 py-3 px-4 border-b border-slate-700 text-slate-400 text-sm font-semibold text-center">
               <div className="col-span-6 sm:col-span-7 text-left">Достижение</div>
               <div className="col-span-2 text-center">Звёзды</div>
             </div>
@@ -50,7 +49,6 @@ export default function StarsLogs() {
                 >
 
                   <div className="flex sm:hidden flex-col gap-1">
-                    <div className="text-slate-400 text-xs">#{index + 1}</div>
                     <div className="text-slate-100 font-semibold text-base">
                       {log.achievement}
                     </div>
@@ -70,27 +68,24 @@ export default function StarsLogs() {
                     </div>
                   </div>
 
-                  <div className="hidden sm:block col-span-1 text-slate-400 text-sm">
-                    {index + 1}
-                  </div>
-
                   <div className="hidden sm:block col-span-6 sm:col-span-7 text-slate-100 text-sm sm:text-base break-words">
                     {log.achievement}
+                      <div className="hidden sm:block col-span-3 text-slate-400 text-xs sm:text-sm">
+                      {new Date(log.date_reward).toLocaleString("ru-RU", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
                   </div>
 
                   <div className="hidden sm:block col-span-2 text-center text-cyan-400 font-semibold">
                     +{log.count_of_added_stars} ⭐
                   </div>
 
-                  <div className="hidden sm:block col-span-3 text-right text-slate-400 text-xs sm:text-sm">
-                    {new Date(log.date_reward).toLocaleString("ru-RU", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </div>
+                  
                 </div>
               ))}
             </div>

@@ -100,18 +100,11 @@ class WorkoutSerializer(serializers.ModelSerializer):
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
-from rest_framework import serializers
-from . import models
 
 class FactualApproachSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.FactualApproach
-        fields = [
-            "factual_time",
-            "speed_exercise_equipment",
-            "weight_exercise_equipment",
-            "count_approach",
-        ]
+        fields = ["factual_time", "speed_exercise_equipment", "weight_exercise_equipment", "count_approach"]
 
 class FactualExerciseInputSerializer(serializers.ModelSerializer):
     approaches = FactualApproachSerializer(many=True)
@@ -123,30 +116,45 @@ class FactualExerciseInputSerializer(serializers.ModelSerializer):
 class FactualWorkoutInputSerializer(serializers.Serializer):
     workout_id = serializers.IntegerField()
     start_time = serializers.DateTimeField()
-    finish_time = serializers.DateTimeField()
+    finish_time = serializers.DateTimeField(required=False)
     exercises = FactualExerciseInputSerializer(many=True)
 
     def create(self, validated_data):
         try:
-            workout_id = validated_data["workout_id"]
-            start_time = validated_data.get("start_time")
-            finish_time = validated_data.get("finish_time")
-            exercises_data = validated_data.pop("exercises", [])
+            workout = models.Workout.objects.get(id=validated_data["workout_id"])
+            workout.start_time = validated_data.get("start_time", workout.start_time)
 
-            workout = models.Workout.objects.get(id=workout_id)
-            workout.is_active = False
-            if start_time:
-                workout.start_time = start_time
-            if finish_time:
-                workout.finish_time = finish_time
+            if "finish_time" in validated_data:
+                workout.finish_time = validated_data["finish_time"]
+                workout.is_completed = True
+                workout.is_active = False
+            else:
+                workout.is_active = True
+                workout.is_completed = False
+
             workout.save()
 
+            exercises_data = validated_data.get("exercises", [])
+            
+            if "finish_time" in validated_data:
+                for ex in exercises_data:
+                    exercise_name = ex.get("name")
+                    if exercise_name:
+                        models.Exercises.objects.get_or_create(
+                            user=workout.user,
+                            name=exercise_name
+                        )
+                
             for exercise_data in exercises_data:
                 approaches_data = exercise_data.pop("approaches", [])
-                factual_exercise = models.FactualExercise.objects.create(
+
+                factual_exercise, _ = models.FactualExercise.objects.update_or_create(
                     workout=workout,
-                    name=exercise_data.get("name", "Без названия")
+                    name=exercise_data.get("name", "Без названия"),
+                    defaults={}
                 )
+
+                factual_exercise.factual_exercise.all().delete()
 
                 for approach_data in approaches_data:
                     models.FactualApproach.objects.create(
@@ -157,7 +165,6 @@ class FactualWorkoutInputSerializer(serializers.Serializer):
             return workout
 
         except Exception as e:
-            print("❌ Error:", e)
             raise serializers.ValidationError(
                 {"message": f"Error with input Workout: {str(e)}"}
             )

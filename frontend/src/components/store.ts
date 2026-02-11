@@ -63,6 +63,14 @@ export const store = configureStore({
     topTenUsersByStars: components.constructorReducer(constants.topTenUsersByStars),
     // @ts-ignore
     rewardStatuses: components.constructorReducer(constants.rewardStatuses),
+    // @ts-ignore
+    workoutStart: components.constructorReducer(constants.workoutStart),
+    // @ts-ignore
+    workoutFinish: components.constructorReducer(constants.workoutFinish),
+    // @ts-ignore
+    workoutSave: components.constructorReducer(constants.workoutSave),
+    // @ts-ignore
+    workoutActive: components.constructorReducer(constants.workoutActive),
 
     
   },

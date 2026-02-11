@@ -401,16 +401,24 @@ def api_delete_friend(request: Request) -> Response:
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def api_all_planned_user_workout(
-    request: Request, user_id: int, is_active: int = 1
+    request: Request, user_id: int, is_completed: int = 0
 ) -> Response:
     page_number = request.GET.get("page", 1)
-    cache_key = f"workouts_planned_{user_id}_{is_active}_page_{page_number}"
+    cache_key = f"workouts_planned_{user_id}_{is_completed}_page_{page_number}"
 
     def load_data():
         user = User.objects.get(id=user_id)
         workouts_qs = models.Workout.objects.filter(
-            user=user, is_active=bool(is_active)
+            user=user, is_completed=not(bool(is_completed)),is_active = False
         ).order_by("-finish_time", "-id")
+
+        active_workouts =  models.Workout.objects.filter(
+            user=user, is_completed=False,is_active = True
+        ).order_by("-id")
+
+        active_workouts_serializer = output_serializers.PlannedWorkoutListSerializer(
+            active_workouts, many=True if isinstance(active_workouts, QuerySet) else False
+        ).data
 
         paginator = PageNumberPagination()
         paginator.page_size = int(request.GET.get("page_size", 10))
@@ -425,6 +433,7 @@ def api_all_planned_user_workout(
             ),
             "current_page": int(page_number),
             "results": workout_qs_serializer,
+            "active_workouts":active_workouts_serializer
         }
         return response_data
 
@@ -493,12 +502,12 @@ def api_create_workout_plan(request: Request) -> Response:
 
         workout = serializer.save()
         user_id = workout.user.id
-        is_active_values = [0, 1]
+        is_completed_values = [0, 1]
         page_numbers = range(1, 20)
 
-        for is_active in is_active_values:
+        for is_completed in is_completed_values:
             for page in page_numbers:
-                key = f"workouts_planned_{user_id}_{is_active}_page_{page}"
+                key = f"workouts_planned_{user_id}_{is_completed}_page_{page}"
                 utils.Cache.delete_cache(key)
 
         utils.Cache.delete_cache(f"workouts_{user_id}")
@@ -509,11 +518,10 @@ def api_create_workout_plan(request: Request) -> Response:
         )
 
     except ValidationError as e:
-        # Ошибка валидации сериалайзера
         return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
-        # Любая другая ошибка при создании
+
         return Response(
             {"error": f"Ошибка при создании тренировки: {str(e)}"},
             status=status.HTTP_400_BAD_REQUEST,
@@ -533,7 +541,7 @@ def api_user_exercises(
 
     def load_data():
         user = User.objects.get(id=user_id)
-        user_exercises = models.Exercises.objects.filter(user=user)
+        user_exercises = models.Exercises.objects.filter(user=user).order_by("name")
         user_exercises_serializer = output_serializers.UserExercisesSimpleSerializer(
             user_exercises, many=True if isinstance(user_exercises, QuerySet) else False
         ).data
@@ -547,7 +555,7 @@ def api_user_exercises(
 
 
 @api_view(http_method_names=["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def api_user_planned_workout_info(
     request: Request,
     workout_id: int,
@@ -570,26 +578,34 @@ def api_user_planned_workout_info(
 
 @extend_schema(
     request=input_serializers.FactualWorkoutInputSerializer,
-    summary="Заполнение данных о проведенной тренировке",
+    summary="Создание / обновление фактической тренировки ",
 )
 @api_view(http_method_names=["POST"])
 @permission_classes([IsAuthenticated])
 def api_input_workout_data(request: Request) -> Response:
-    serializer = input_serializers.FactualWorkoutInputSerializer(data=request.data)
-    if serializer.is_valid():
-        workout = serializer.save()
-        user_id = workout.user.id
 
+    serializer = input_serializers.FactualWorkoutInputSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    workout = serializer.save()
+    user_id = workout.user.id
+    is_completed = workout.is_completed is True
+
+    if not settings.DEBUG:
+        utils.Cache.delete_by_pattern(f"*workouts_planned_{user_id}_*")
+    if is_completed:
+        workout.is_active = False
         try:
             utils.get_reward_for_completing_achievement(user_id)
         except Exception as e:
             return Response(
-                data={"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                data={"message": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        if settings.DEBUG == False:
+        if not settings.DEBUG:
             utils.Cache.delete_by_pattern(f"*exercise_info_{user_id}_*")
-            utils.Cache.delete_by_pattern(f"*workouts_planned_{user_id}_*")
             utils.Cache.delete_by_pattern(f"*stats_{user_id}_*")
 
         utils.Cache.delete_cache(f"workout_info_{workout.id}")
@@ -597,10 +613,11 @@ def api_input_workout_data(request: Request) -> Response:
         utils.Cache.delete_cache(f"reward_logs_{user_id}")
         utils.Cache.delete_cache(f"reward_statuses_{user_id}")
 
-        return Response(
-            {"message": "Workout successfully input"}, status=status.HTTP_201_CREATED
+    
+    return Response(
+            {"message": "Workout information successfully update!"}, status=status.HTTP_201_CREATED
         )
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -615,7 +632,8 @@ def api_repeat_workout(request: Request, user_id: int, workout_id: int) -> Respo
         new_workout = models.Workout.objects.get(id=workout_id)
         new_workout.user = user
         new_workout.pk = None
-        new_workout.is_active = True
+        new_workout.is_completed = False
+        new_workout.is_active = False
         new_workout.start_time = None
         new_workout.is_recommended = False
         new_workout.finish_time = None
@@ -652,6 +670,7 @@ def api_repeat_workout(request: Request, user_id: int, workout_id: int) -> Respo
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
 
 
 @api_view(["GET"])
@@ -668,6 +687,17 @@ def api_workout_info(request: Request, workout_id: int) -> Response:
 
     data = utils.Cache.get_cache(key=cache_key, query=load_data, timeout=60 * 3)
     return Response(data={"data": data}, status=status.HTTP_200_OK)
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+
+@api_view(["GET"])
+@permission_classes([])
+def api_workout_active_info(request: Request, workout_id: int) -> Response:
+    workout_data = models.Workout.objects.get(id=workout_id)
+    workout_data_serializer = output_serializers.FactualWorkoutRetrieveSerializer(
+        workout_data, many=True if isinstance(workout_data, QuerySet) else False
+    ).data
+    return Response(data={"data": workout_data_serializer}, status=status.HTTP_200_OK)
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
@@ -823,6 +853,7 @@ def api_exercise_information(request, user_id: int):
         if exercise_name:
             valid_approaches = valid_approaches.filter(exercise__name=exercise_name)
 
+
         last_workout_date = valid_approaches.order_by(
             "-exercise__workout__start_time"
         ).first()
@@ -835,8 +866,9 @@ def api_exercise_information(request, user_id: int):
             max_by_weight = (
                 max_by_weight.values("weight_exercise_equipment")
                 .annotate(max_count=Max("count_approach"))
-                .order_by("max_count")
+                .order_by("-weight_exercise_equipment")
             )
+
 
             stats = valid_approaches.values(name=F("exercise__name")).annotate(
                 total_approaches=Count("id"),
@@ -1042,3 +1074,16 @@ def api_reward_statuses(request: Request, user_id: int) -> Response:
         data={"data": data},
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(http_method_names=["GET"])
+@permission_classes([])
+def api_change(request: Request) -> Response:
+    workouts = models.Workout.objects.all()
+    for workout in workouts:
+        if workout.is_completed == True:
+            workout.is_completed = False
+        else:
+            workout.is_completed = True
+        workout.save()
+    return Response(data={"ok":"ok"})
